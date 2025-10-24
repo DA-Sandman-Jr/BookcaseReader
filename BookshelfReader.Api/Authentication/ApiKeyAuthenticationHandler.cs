@@ -54,7 +54,7 @@ internal sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKey
 
     private static bool IsMatch(string? expectedKey, string providedKey)
     {
-        if (string.IsNullOrEmpty(expectedKey))
+        if (string.IsNullOrWhiteSpace(expectedKey) || string.IsNullOrEmpty(providedKey))
         {
             return false;
         }
@@ -62,13 +62,25 @@ internal sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKey
         var expectedBytes = Encoding.UTF8.GetBytes(expectedKey);
         var providedBytes = Encoding.UTF8.GetBytes(providedKey);
 
-        if (expectedBytes.Length != providedBytes.Length)
+        try
         {
-            CryptographicOperations.FixedTimeEquals(expectedBytes, expectedBytes);
-            CryptographicOperations.FixedTimeEquals(providedBytes, providedBytes);
-            return false;
-        }
+            var expectedHash = SHA256.HashData(expectedBytes);
+            var providedHash = SHA256.HashData(providedBytes);
 
-        return CryptographicOperations.FixedTimeEquals(expectedBytes, providedBytes);
+            try
+            {
+                return CryptographicOperations.FixedTimeEquals(expectedHash, providedHash);
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(expectedHash);
+                CryptographicOperations.ZeroMemory(providedHash);
+            }
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(expectedBytes);
+            CryptographicOperations.ZeroMemory(providedBytes);
+        }
     }
 }
