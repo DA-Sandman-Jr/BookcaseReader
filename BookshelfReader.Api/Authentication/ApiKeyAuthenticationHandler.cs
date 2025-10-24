@@ -22,19 +22,22 @@ internal sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKey
     {
         if (Options.ValidKeys.Count == 0)
         {
-            Logger.LogWarning("API key authentication is configured without any valid keys.");
-            return Task.FromResult(AuthenticateResult.Fail("No API keys configured."));
+            Logger.LogError("API key authentication is configured without any valid keys. Rejecting request.");
+            return Task.FromResult(AuthenticateResult.Fail("Invalid API key."));
         }
 
         if (!Request.Headers.TryGetValue(Options.HeaderName, out var headerValues))
         {
-            return Task.FromResult(AuthenticateResult.Fail("Missing API key header."));
+            Logger.LogWarning("Request from {RemoteIp} is missing the required API key header {HeaderName}.",
+                Context.Connection.RemoteIpAddress, Options.HeaderName);
+            return Task.FromResult(AuthenticateResult.Fail("Invalid API key."));
         }
 
         var providedKey = headerValues.ToString();
         if (string.IsNullOrWhiteSpace(providedKey))
         {
-            return Task.FromResult(AuthenticateResult.Fail("API key header is empty."));
+            Logger.LogWarning("Request from {RemoteIp} provided an empty API key header.", Context.Connection.RemoteIpAddress);
+            return Task.FromResult(AuthenticateResult.Fail("Invalid API key."));
         }
 
         foreach (var validKey in Options.ValidKeys)
@@ -49,6 +52,7 @@ internal sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKey
             }
         }
 
+        Logger.LogWarning("Request from {RemoteIp} presented an invalid API key.", Context.Connection.RemoteIpAddress);
         return Task.FromResult(AuthenticateResult.Fail("Invalid API key."));
     }
 
