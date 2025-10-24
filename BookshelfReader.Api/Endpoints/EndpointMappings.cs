@@ -1,4 +1,6 @@
+using System.Buffers;
 using System.Collections.Generic;
+using System.IO;
 using BookshelfReader.Core.Abstractions;
 using BookshelfReader.Core.Models;
 using BookshelfReader.Core.Options;
@@ -25,12 +27,13 @@ internal static class EndpointMappings
             .ProducesValidationProblem();
 
         apiGroup.MapPost("/bookshelf/parse", ParseAsync)
-            .DisableAntiforgery()
             .Accepts<IFormFile>("multipart/form-data")
             .WithName("ParseBookshelf")
             .WithTags(BookshelfTag)
             .Produces<ParseResult>(StatusCodes.Status200OK)
-            .ProducesValidationProblem();
+            .Produces(StatusCodes.Status401Unauthorized)
+            .ProducesValidationProblem()
+            .RequireAuthorization();
     }
 
     private static async Task<Results<Ok<IEnumerable<BookMetadata>>, ValidationProblem>> LookupAsync(
@@ -83,9 +86,40 @@ internal static class EndpointMappings
             return CreateValidationProblem("image", "Unsupported image content type.");
         }
 
-        await using var imageStream = file.OpenReadStream();
+        await using var imageStream = file.OpenReadStream(options.MaxBytes);
+
+        if (!await IsSupportedImageAsync(imageStream, contentType, cancellationToken).ConfigureAwait(false))
+        {
+            return CreateValidationProblem("image", "Uploaded image file content does not match the declared type.");
+        }
+
         var result = await processor.ProcessAsync(imageStream, cancellationToken).ConfigureAwait(false);
         return TypedResults.Ok(result);
+    }
+
+    private static async Task<bool> IsSupportedImageAsync(Stream stream, string contentType, CancellationToken cancellationToken)
+    {
+        var buffer = ArrayPool<byte>.Shared.Rent(8);
+
+        try
+        {
+            stream.Position = 0;
+            var bytesRead = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken).ConfigureAwait(false);
+            stream.Position = 0;
+
+            return contentType switch
+            {
+                "image/jpeg" => bytesRead >= 3 && buffer[0] == 0xFF && buffer[1] == 0xD8 && buffer[2] == 0xFF,
+                "image/png" => bytesRead >= 8
+                    && buffer[0] == 0x89 && buffer[1] == 0x50 && buffer[2] == 0x4E && buffer[3] == 0x47
+                    && buffer[4] == 0x0D && buffer[5] == 0x0A && buffer[6] == 0x1A && buffer[7] == 0x0A,
+                _ => false,
+            };
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
     }
 
     private static ValidationProblem CreateValidationProblem(string key, string message)

@@ -1,3 +1,4 @@
+using BookshelfReader.Api.Authentication;
 using BookshelfReader.Api.Endpoints;
 using BookshelfReader.Core.Abstractions;
 using BookshelfReader.Core.Options;
@@ -17,6 +18,12 @@ builder.Services.Configure<UploadsOptions>(builder.Configuration.GetSection(Uplo
 builder.Services.Configure<TesseractOcrOptions>(builder.Configuration.GetSection(TesseractOcrOptions.SectionName));
 builder.Services.Configure<SegmentationOptions>(builder.Configuration.GetSection(SegmentationOptions.SectionName));
 builder.Services.Configure<ParsingOptions>(builder.Configuration.GetSection(ParsingOptions.SectionName));
+
+builder.Services.AddAuthentication(ApiKeyAuthenticationDefaults.AuthenticationScheme)
+    .AddScheme<ApiKeyAuthenticationOptions, ApiKeyAuthenticationHandler>(
+        ApiKeyAuthenticationDefaults.AuthenticationScheme,
+        options => builder.Configuration.GetSection(ApiKeyAuthenticationOptions.SectionName).Bind(options));
+builder.Services.AddAuthorization();
 
 builder.Services.AddSingleton<IBookSegmentationService, OpenCvBookSegmentationService>();
 builder.Services.AddSingleton<IOcrService, TesseractOcrService>();
@@ -38,6 +45,9 @@ var app = builder.Build();
 
 app.UseExceptionHandler();
 app.UseStatusCodePages();
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 if (!app.Environment.IsDevelopment())
 {
