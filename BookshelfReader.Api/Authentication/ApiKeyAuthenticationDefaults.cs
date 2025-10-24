@@ -1,6 +1,6 @@
 namespace BookshelfReader.Api.Authentication;
 
-internal static class ApiKeyAuthenticationDefaults
+public static class ApiKeyAuthenticationDefaults
 {
-    internal const string AuthenticationScheme = "ApiKey";
+    public const string AuthenticationScheme = "ApiKey";
 }

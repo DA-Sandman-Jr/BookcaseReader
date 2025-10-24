@@ -39,6 +39,38 @@ dotnet run
 
 Swagger UI is available at `https://localhost:5001/swagger`.
 
+## Adding the endpoints to an existing ASP.NET Core app
+
+If you already have an ASP.NET Core application and want to expose the bookshelf parsing endpoints from the same host:
+
+1. Reference the `BookshelfReader.Api`, `BookshelfReader.Core`, and `BookshelfReader.Infrastructure` projects from your web application.
+2. Configure services and authentication in `Program.cs` (add `using BookshelfReader.Api.Extensions;` and `using BookshelfReader.Api.Authentication;`):
+
+   ```csharp
+   builder.Services.AddBookshelfReader(builder.Configuration);
+
+   builder.Services
+       .AddAuthentication(options =>
+       {
+           options.DefaultScheme = ApiKeyAuthenticationDefaults.AuthenticationScheme;
+           options.DefaultAuthenticateScheme = ApiKeyAuthenticationDefaults.AuthenticationScheme;
+           options.DefaultChallengeScheme = ApiKeyAuthenticationDefaults.AuthenticationScheme;
+       })
+       .AddBookshelfReaderApiKey();
+
+   builder.Services.AddAuthorization();
+   ```
+
+3. Map the endpoints alongside your existing routes:
+
+   ```csharp
+   app.MapBookshelfReaderApi();
+   ```
+
+4. Copy the `Authentication`, `Uploads`, and other relevant sections from `BookshelfReader.Api/appsettings.json` into your application's configuration so the options binding succeeds. At least one non-empty API key must be provided before startup.
+
+The `AddBookshelfReader` extension wires up the OCR/segmentation pipeline, validation rules, HTTP client for metadata lookup, and multipart upload limits. The `MapBookshelfReaderApi` extension registers the `/api/books/lookup` and `/api/bookshelf/parse` routes so you can expose them from any existing minimal API or MVC host.
+
 ### Sample requests
 
 Parse a bookshelf image:

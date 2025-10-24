@@ -1,22 +1,25 @@
 using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
+using BookshelfReader.Api.Authentication;
 using BookshelfReader.Core.Abstractions;
 using BookshelfReader.Core.Models;
 using BookshelfReader.Core.Options;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Options;
 
 namespace BookshelfReader.Api.Endpoints;
 
-internal static class EndpointMappings
+public static class BookshelfReaderEndpointRouteBuilderExtensions
 {
     private const string ApiBasePath = "/api";
     private const string BooksTag = "Books";
     private const string BookshelfTag = "Bookshelf";
 
-    internal static void MapApiEndpoints(this IEndpointRouteBuilder app)
+    public static RouteGroupBuilder MapBookshelfReaderApi(this IEndpointRouteBuilder app)
     {
         var apiGroup = app.MapGroup(ApiBasePath).WithOpenApi();
 
@@ -33,7 +36,12 @@ internal static class EndpointMappings
             .Produces<ParseResult>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status401Unauthorized)
             .ProducesValidationProblem()
-            .RequireAuthorization();
+            .RequireAuthorization(new AuthorizeAttribute
+            {
+                AuthenticationSchemes = ApiKeyAuthenticationDefaults.AuthenticationScheme
+            });
+
+        return apiGroup;
     }
 
     private static async Task<Results<Ok<IEnumerable<BookMetadata>>, ValidationProblem>> LookupAsync(
