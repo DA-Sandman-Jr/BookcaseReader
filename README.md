@@ -1,1 +1,72 @@
-# BookcaseReader
+# BookshelfReader
+
+BookshelfReader is a .NET 8 Web API that turns a raw bookshelf photo into structured book metadata. The service segments books using OpenCV, performs OCR with Tesseract, parses probable titles/authors, classifies genres using keyword rules, and enriches metadata via the public Open Library catalog.
+
+## Solution structure
+
+```
+BookshelfReader.sln
+├── BookshelfReader.Api             # Minimal APIs, dependency injection, configuration
+├── BookshelfReader.Core            # Domain models, options, abstraction interfaces
+├── BookshelfReader.Infrastructure  # OpenCV segmentation, Tesseract OCR, parsing, genre classification, lookups
+└── BookshelfReader.Tests           # xUnit test suite (FluentAssertions + MockHttp)
+```
+
+## Prerequisites
+
+* .NET 8 SDK
+* Native dependencies for [OpenCvSharp4](https://github.com/shimat/opencvsharp) (the `OpenCvSharp4.runtime.anycpu` package loads the unmanaged binaries automatically on supported platforms)
+* [Tesseract OCR language data](https://github.com/tesseract-ocr/tessdata). By default the API looks for `tessdata` inside the application directory; override via `Ocr:Tesseract:DataPath` in configuration.
+
+## Configuration
+
+`BookshelfReader.Api/appsettings.json` contains sensible defaults:
+
+* **Uploads** – maximum upload size (10 MB) and allowed MIME types.
+* **OpenLibrary** – base URL for outbound metadata lookups.
+* **Ocr:Tesseract** – path to tessdata, language(s), and max OCR concurrency.
+* **Segmentation / Parsing** – heuristics for contour filtering and text parsing.
+
+Override any value via environment variables or user secrets (e.g. `ASPNETCORE_ENVIRONMENT=Development`).
+
+## Running the API
+
+```
+dotnet restore
+cd BookshelfReader.Api
+dotnet run
+```
+
+Swagger UI is available at `https://localhost:5001/swagger`.
+
+### Sample requests
+
+Parse a bookshelf image:
+
+```
+curl -X POST "https://localhost:5001/api/bookshelf/parse" \
+  -H "accept: application/json" \
+  -F "image=@/path/to/bookshelf.jpg"
+```
+
+Lookup metadata via Open Library:
+
+```
+curl "https://localhost:5001/api/books/lookup?name=the%20hobbit"
+```
+
+## Tests
+
+```
+dotnet test
+```
+
+The test suite currently covers the Open Library integration. Additional tests can be added around parsing, segmentation, and orchestration using golden images or fixtures.
+
+## Notes
+
+* Upload validation rejects non-image content types and files over the configured size limit.
+* Segmentation uses grayscale → blur → Canny → morphology to find spine contours, deskews via `minAreaRect`, and crops each book before OCR.
+* OCR tries 0°, 90°, and 270° rotations to improve recognition when spines are vertical.
+* Genre classification is rule-based today but the `IGenreClassifier` abstraction makes it easy to plug in ML/LLM classifiers later.
+* Lookup timeouts or HTTP failures are logged and surfaced as empty results rather than 5xx errors.
