@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Globalization;
 using System.Text.RegularExpressions;
 using BookshelfReader.Core.Abstractions;
@@ -23,72 +24,111 @@ public sealed class BookParsingService : IBookParsingService
 
     public BookCandidate Parse(BookSegment segment, OcrResult ocr)
     {
-        var candidate = new BookCandidate
+        ArgumentNullException.ThrowIfNull(segment);
+        ArgumentNullException.ThrowIfNull(ocr);
+
+        var candidate = CreateCandidate(segment, ocr);
+        if (string.IsNullOrWhiteSpace(candidate.RawText))
+        {
+            return HandleEmptyText(candidate, segment);
+        }
+
+        var lines = NormalizeLines(candidate.RawText);
+        if (lines.Count == 0)
+        {
+            return HandleUnparsableText(candidate, segment);
+        }
+
+        var probableTitle = DetermineTitle(lines);
+        candidate.Title = ToTitleCase(probableTitle);
+        candidate.Author = DetermineAuthor(lines);
+
+        candidate.Confidence = CalculateConfidence(candidate.Title, candidate.Author, ocr.Confidence);
+        AddAlternativeTitleNotes(candidate, probableTitle, lines);
+
+        return candidate;
+    }
+
+    private BookCandidate CreateCandidate(BookSegment segment, OcrResult ocr)
+    {
+        return new BookCandidate
         {
             BoundingBox = segment.BoundingBox,
             RawText = ocr.Text
         };
+    }
 
-        if (string.IsNullOrWhiteSpace(ocr.Text))
-        {
-            candidate.Confidence = 0;
-            candidate.Notes.Add("OCR returned no text");
-            _logger.LogDebug("OCR returned empty text for bounding box {BoundingBox}", segment.BoundingBox);
-            return candidate;
-        }
+    private BookCandidate HandleEmptyText(BookCandidate candidate, BookSegment segment)
+    {
+        candidate.Confidence = 0;
+        candidate.Notes.Add("OCR returned no text");
+        _logger.LogDebug("OCR returned empty text for bounding box {BoundingBox}", segment.BoundingBox);
+        return candidate;
+    }
 
-        var lines = ocr.Text
+    private BookCandidate HandleUnparsableText(BookCandidate candidate, BookSegment segment)
+    {
+        candidate.Confidence = 0;
+        candidate.Notes.Add("Unable to parse OCR lines");
+        _logger.LogDebug("OCR produced no parsable lines for bounding box {BoundingBox}", segment.BoundingBox);
+        return candidate;
+    }
+
+    private static List<string> NormalizeLines(string text)
+    {
+        return text
             .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
             .Select(l => CleanupRegex.Replace(l, " ").Trim())
             .Where(l => !string.IsNullOrWhiteSpace(l))
             .Distinct()
             .ToList();
+    }
 
-        if (lines.Count == 0)
-        {
-            candidate.Confidence = 0;
-            candidate.Notes.Add("Unable to parse OCR lines");
-            _logger.LogDebug("OCR produced no parsable lines for bounding box {BoundingBox}", segment.BoundingBox);
-            return candidate;
-        }
+    private static string DetermineTitle(List<string> lines)
+    {
+        return lines.OrderByDescending(l => l.Length).First();
+    }
 
-        var probableTitle = lines.OrderByDescending(l => l.Length).First();
-        candidate.Title = ToTitleCase(probableTitle);
-
+    private string DetermineAuthor(List<string> lines)
+    {
         var authorLine = FindAuthorLine(lines);
-        if (!string.IsNullOrEmpty(authorLine))
-        {
-            candidate.Author = ToTitleCase(authorLine);
-        }
+        return string.IsNullOrEmpty(authorLine) ? string.Empty : ToTitleCase(authorLine);
+    }
 
+    private double CalculateConfidence(string title, string author, double ocrConfidence)
+    {
         var confidence = _options.BaseConfidence;
-        if (!string.IsNullOrEmpty(candidate.Title))
+
+        if (!string.IsNullOrEmpty(title))
         {
-            confidence += Math.Min(0.4, candidate.Title.Length / 50d);
+            confidence += Math.Min(0.4, title.Length / 50d);
         }
 
-        if (!string.IsNullOrEmpty(candidate.Author))
+        if (!string.IsNullOrEmpty(author))
         {
             confidence += 0.2;
         }
 
-        if (ocr.Confidence > 0)
+        if (ocrConfidence > 0)
         {
-            confidence = (confidence + ocr.Confidence) / 2;
+            confidence = (confidence + ocrConfidence) / 2;
         }
 
-        candidate.Confidence = Math.Clamp(confidence, 0, 0.99);
+        return Math.Clamp(confidence, 0, 0.99);
+    }
 
-        if (lines.Count > 1)
+    private static void AddAlternativeTitleNotes(BookCandidate candidate, string probableTitle, List<string> lines)
+    {
+        if (lines.Count <= 1)
         {
-            var best = Process.ExtractTop(probableTitle, lines, limit: 3);
-            if (best.Count > 1 && best[1].Score > 90 && best[1].Value != probableTitle)
-            {
-                candidate.Notes.Add($"Alternative title candidate: {best[1].Value}");
-            }
+            return;
         }
 
-        return candidate;
+        var best = Process.ExtractTop(probableTitle, lines, limit: 3);
+        if (best.Count > 1 && best[1].Score > 90 && best[1].Value != probableTitle)
+        {
+            candidate.Notes.Add($"Alternative title candidate: {best[1].Value}");
+        }
     }
 
     private string FindAuthorLine(List<string> lines)
