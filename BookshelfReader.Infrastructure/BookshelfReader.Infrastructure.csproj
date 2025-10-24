@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\BookshelfReader.Core\BookshelfReader.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="OpenCvSharp4" Version="4.9.0.20240115" />
+    <PackageReference Include="OpenCvSharp4.runtime.anycpu" Version="4.9.0.20240115" />
+    <PackageReference Include="Tesseract" Version="5.2.0" />
+    <PackageReference Include="FuzzySharp" Version="2.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.0" />
+  </ItemGroup>
+</Project>
