@@ -32,8 +32,8 @@ builder.Services.AddOptions<UploadsOptions>()
     .Validate(options => options.MaxBytes is > 0 and <= 20 * 1024 * 1024,
         "Uploads:MaxBytes must be between 1 byte and 20 MB.")
     .Validate(options => options.AllowedContentTypes is { Count: > 0 }
-        && options.AllowedContentTypes.All(type => type.StartsWith("image/", StringComparison.OrdinalIgnoreCase)),
-        "Uploads:AllowedContentTypes must contain at least one image MIME type.")
+        && options.AllowedContentTypes.All(UploadsOptions.IsSupportedContentType),
+        $"Uploads:AllowedContentTypes must contain only supported image MIME types ({string.Join(", ", UploadsOptions.SupportedImageSignatures.Keys)}).")
     .ValidateOnStart();
 
 builder.Services.AddOptions<FormOptions>()

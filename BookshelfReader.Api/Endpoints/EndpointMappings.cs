@@ -99,26 +99,39 @@ internal static class EndpointMappings
 
     private static async Task<bool> IsSupportedImageAsync(Stream stream, string contentType, CancellationToken cancellationToken)
     {
-        var buffer = ArrayPool<byte>.Shared.Rent(8);
+        if (!UploadsOptions.SupportedImageSignatures.TryGetValue(contentType, out var signature))
+        {
+            return false;
+        }
+
+        var signatureSpan = signature.Span;
+        var buffer = ArrayPool<byte>.Shared.Rent(signatureSpan.Length);
 
         try
         {
             stream.Position = 0;
-            var bytesRead = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken).ConfigureAwait(false);
+            var bytesRead = await stream.ReadAsync(buffer.AsMemory(0, signatureSpan.Length), cancellationToken)
+                .ConfigureAwait(false);
             stream.Position = 0;
 
-            return contentType switch
+            if (bytesRead < signatureSpan.Length)
             {
-                "image/jpeg" => bytesRead >= 3 && buffer[0] == 0xFF && buffer[1] == 0xD8 && buffer[2] == 0xFF,
-                "image/png" => bytesRead >= 8
-                    && buffer[0] == 0x89 && buffer[1] == 0x50 && buffer[2] == 0x4E && buffer[3] == 0x47
-                    && buffer[4] == 0x0D && buffer[5] == 0x0A && buffer[6] == 0x1A && buffer[7] == 0x0A,
-                _ => false,
-            };
+                return false;
+            }
+
+            for (var i = 0; i < signatureSpan.Length; i++)
+            {
+                if (buffer[i] != signatureSpan[i])
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
         finally
         {
-            ArrayPool<byte>.Shared.Return(buffer);
+            ArrayPool<byte>.Shared.Return(buffer, clearArray: true);
         }
     }
 
