@@ -89,14 +89,15 @@ public static class BookshelfReaderEndpointRouteBuilderExtensions
         }
 
         var contentType = file.ContentType;
-        if (string.IsNullOrWhiteSpace(contentType) || !options.AllowedContentTypes.Contains(contentType))
+        if (!UploadsOptions.TryGetCanonicalContentType(contentType, out var canonicalContentType)
+            || !options.AllowedContentTypes.Contains(canonicalContentType))
         {
             return CreateValidationProblem("image", "Unsupported image content type.");
         }
 
         await using var imageStream = file.OpenReadStream(options.MaxBytes);
 
-        if (!await IsSupportedImageAsync(imageStream, contentType, cancellationToken).ConfigureAwait(false))
+        if (!await IsSupportedImageAsync(imageStream, canonicalContentType, cancellationToken).ConfigureAwait(false))
         {
             return CreateValidationProblem("image", "Uploaded image file content does not match the declared type.");
         }
@@ -107,7 +108,7 @@ public static class BookshelfReaderEndpointRouteBuilderExtensions
 
     private static async Task<bool> IsSupportedImageAsync(Stream stream, string contentType, CancellationToken cancellationToken)
     {
-        if (!UploadsOptions.SupportedImageSignatures.TryGetValue(contentType, out var signature))
+        if (!UploadsOptions.TryGetImageSignature(contentType, out var signature))
         {
             return false;
         }

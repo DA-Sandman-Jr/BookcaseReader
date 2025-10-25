@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 using BookshelfReader.Core.Abstractions;
 using BookshelfReader.Core.Models;
 using BookshelfReader.Core.Options;
@@ -11,8 +13,10 @@ public sealed class TesseractOcrService : IOcrService, IDisposable
 {
     private readonly TesseractOcrOptions _options;
     private readonly ILogger<TesseractOcrService> _logger;
-    private readonly TesseractEngine _engine;
+    private readonly ConcurrentBag<TesseractEngine> _enginePool = new();
     private readonly SemaphoreSlim _semaphore;
+    private readonly string _dataPath;
+    private readonly string _language;
     private bool _disposed;
 
     public TesseractOcrService(IOptions<TesseractOcrOptions> options, ILogger<TesseractOcrService> logger)
@@ -20,21 +24,23 @@ public sealed class TesseractOcrService : IOcrService, IDisposable
         _options = options.Value;
         _logger = logger;
 
-        var dataPath = string.IsNullOrWhiteSpace(_options.DataPath)
+        _dataPath = string.IsNullOrWhiteSpace(_options.DataPath)
             ? Path.Combine(AppContext.BaseDirectory, "tessdata")
             : _options.DataPath;
+        _language = _options.Language;
 
-        if (!Directory.Exists(dataPath))
+        if (!Directory.Exists(_dataPath))
         {
-            _logger.LogWarning("Tesseract data path '{Path}' not found. OCR results may be degraded.", dataPath);
+            _logger.LogWarning("Tesseract data path '{Path}' not found. OCR results may be degraded.", _dataPath);
         }
-
-        _engine = new TesseractEngine(dataPath, _options.Language, EngineMode.Default);
-        _engine.SetVariable("tessedit_do_invert", "0");
-        _engine.DefaultPageSegMode = PageSegMode.Auto;
 
         var parallelism = Math.Max(1, _options.MaxDegreeOfParallelism);
         _semaphore = new SemaphoreSlim(parallelism, parallelism);
+
+        for (var i = 0; i < parallelism; i++)
+        {
+            _enginePool.Add(CreateEngine());
+        }
     }
 
     public async Task<OcrResult> RecognizeAsync(byte[] imageData, CancellationToken cancellationToken = default)
@@ -47,8 +53,14 @@ public sealed class TesseractOcrService : IOcrService, IDisposable
         }
 
         await _semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+        TesseractEngine? engine = null;
         try
         {
+            if (!_enginePool.TryTake(out engine))
+            {
+                engine = CreateEngine();
+            }
+
             using var pix = Pix.LoadFromMemory(imageData);
             var orientations = new List<(int Angle, Func<Pix> Factory)>
             {
@@ -66,7 +78,7 @@ public sealed class TesseractOcrService : IOcrService, IDisposable
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 using var oriented = orientation.Factory();
-                using var page = _engine.Process(oriented);
+                using var page = engine.Process(oriented);
                 var text = page.GetText() ?? string.Empty;
                 var confidence = page.GetMeanConfidence();
                 attempts.Add(text);
@@ -94,6 +106,10 @@ public sealed class TesseractOcrService : IOcrService, IDisposable
         }
         finally
         {
+            if (engine is not null)
+            {
+                _enginePool.Add(engine);
+            }
             _semaphore.Release();
         }
     }
@@ -105,8 +121,19 @@ public sealed class TesseractOcrService : IOcrService, IDisposable
             return;
         }
 
-        _engine.Dispose();
+        while (_enginePool.TryTake(out var engine))
+        {
+            engine.Dispose();
+        }
         _semaphore.Dispose();
         _disposed = true;
+    }
+
+    private TesseractEngine CreateEngine()
+    {
+        var engine = new TesseractEngine(_dataPath, _language, EngineMode.Default);
+        engine.SetVariable("tessedit_do_invert", "0");
+        engine.DefaultPageSegMode = PageSegMode.Auto;
+        return engine;
     }
 }
