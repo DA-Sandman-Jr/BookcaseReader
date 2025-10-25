@@ -33,6 +33,7 @@ public sealed class OpenCvBookSegmentationService : IBookSegmentationService
         }
 
         using var sourceMat = Cv2.ImDecode(data, ImreadModes.Color);
+        cancellationToken.ThrowIfCancellationRequested();
         if (sourceMat.Empty())
         {
             _logger.LogWarning("Unable to decode uploaded image for segmentation");
@@ -41,32 +42,45 @@ public sealed class OpenCvBookSegmentationService : IBookSegmentationService
 
         using var gray = new Mat();
         Cv2.CvtColor(sourceMat, gray, ColorConversionCodes.BGR2GRAY);
+        cancellationToken.ThrowIfCancellationRequested();
 
         using var blurred = new Mat();
         Cv2.GaussianBlur(gray, blurred, new Size(5, 5), 0);
+        cancellationToken.ThrowIfCancellationRequested();
 
         using var edges = new Mat();
         Cv2.Canny(blurred, edges, 30, 120);
+        cancellationToken.ThrowIfCancellationRequested();
 
         using var kernel = Cv2.GetStructuringElement(MorphShapes.Rect, new Size(5, 5));
         using var closed = new Mat();
         Cv2.MorphologyEx(edges, closed, MorphTypes.Close, kernel, iterations: 2);
+        cancellationToken.ThrowIfCancellationRequested();
 
         Cv2.FindContours(closed, out var contours, out _, RetrievalModes.External, ContourApproximationModes.ApproxSimple);
+        cancellationToken.ThrowIfCancellationRequested();
 
         if (contours.Length == 0)
         {
             return Array.Empty<BookSegment>();
         }
 
+        var orderedContours = contours
+            .Select(contour => new { Contour = contour, Rect = Cv2.BoundingRect(contour) })
+            .OrderBy(item => item.Rect.X)
+            .ToArray();
+        cancellationToken.ThrowIfCancellationRequested();
+
         var segments = new List<BookSegment>();
         var imageArea = sourceMat.Width * sourceMat.Height;
 
-        foreach (var contour in contours)
+        foreach (var item in orderedContours)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var rect = Cv2.BoundingRect(contour);
+            var contour = item.Contour;
+            var rect = item.Rect;
+
             if (rect.Width <= 0 || rect.Height <= 0)
             {
                 continue;
@@ -98,6 +112,7 @@ public sealed class OpenCvBookSegmentationService : IBookSegmentationService
             var rotationMatrix = Cv2.GetRotationMatrix2D(rotatedRect.Center, angle, 1.0);
             using var rotatedImage = new Mat();
             Cv2.WarpAffine(sourceMat, rotatedImage, rotationMatrix, sourceMat.Size(), InterpolationFlags.Linear, BorderTypes.Replicate);
+            cancellationToken.ThrowIfCancellationRequested();
 
             var cropRect = new OpenCvSharp.Rect(
                 (int)Math.Round(rotatedRect.Center.X - size.Width / 2),
@@ -121,6 +136,7 @@ public sealed class OpenCvBookSegmentationService : IBookSegmentationService
             {
                 continue;
             }
+            cancellationToken.ThrowIfCancellationRequested();
 
             var boundingBox = new Rect(rect.X, rect.Y, rect.Width, rect.Height);
             segments.Add(new BookSegment
@@ -128,6 +144,12 @@ public sealed class OpenCvBookSegmentationService : IBookSegmentationService
                 BoundingBox = boundingBox,
                 ImageData = buffer
             });
+
+            if (_options.MaxSegments > 0 && segments.Count >= _options.MaxSegments)
+            {
+                _logger.LogInformation("Max segment limit of {MaxSegments} reached; stopping contour processing.", _options.MaxSegments);
+                break;
+            }
         }
 
         return segments
