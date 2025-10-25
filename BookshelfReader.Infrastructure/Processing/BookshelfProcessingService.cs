@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using BookshelfReader.Core.Abstractions;
@@ -40,36 +41,23 @@ public sealed class BookshelfProcessingService : IBookshelfProcessingService
 
         for (var index = 0; index < segments.Count; index++)
         {
-            var segment = segments[index];
             cancellationToken.ThrowIfCancellationRequested();
 
-            try
-            {
-                var ocrResult = await _ocrService.RecognizeAsync(segment.ImageData, cancellationToken).ConfigureAwait(false);
-                var parsed = _parsingService.Parse(segment, ocrResult);
-                parsed.Genres = _genreClassifier.Classify(parsed.Title, parsed.RawText).ToList();
+            var (candidate, errorNote) = await ProcessSegmentAsync(
+                    segments[index],
+                    index,
+                    imageId,
+                    cancellationToken)
+                .ConfigureAwait(false);
 
-                if (ocrResult.Attempts.Count > 1)
-                {
-                    parsed.Notes.Add("OCR tried rotations: " + string.Join(", ", ocrResult.Attempts.Select((_, attemptIndex) => attemptIndex switch
-                    {
-                        0 => "0°",
-                        1 => "90°",
-                        2 => "270°",
-                        _ => "other"
-                    })));
-                }
+            if (candidate is not null)
+            {
+                books.Add(candidate);
+            }
 
-                books.Add(parsed);
-            }
-            catch (OperationCanceledException)
+            if (!string.IsNullOrEmpty(errorNote))
             {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to process segment {SegmentIndex} for image {ImageId}", index, imageId);
-                diagnosticNotes.Add($"Segment {index}: {ex.Message}");
+                diagnosticNotes.Add(errorNote);
             }
         }
 
@@ -86,5 +74,51 @@ public sealed class BookshelfProcessingService : IBookshelfProcessingService
                 Notes = diagnosticNotes
             }
         };
+    }
+
+    private async Task<(BookCandidate? Candidate, string? ErrorNote)> ProcessSegmentAsync(
+        BookSegment segment,
+        int index,
+        Guid imageId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var ocrResult = await _ocrService.RecognizeAsync(segment.ImageData, cancellationToken).ConfigureAwait(false);
+            var candidate = _parsingService.Parse(segment, ocrResult);
+            candidate.Genres = _genreClassifier.Classify(candidate.Title, candidate.RawText).ToList();
+            AddRotationNotes(candidate, ocrResult.Attempts);
+
+            return (candidate, null);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to process segment {SegmentIndex} for image {ImageId}", index, imageId);
+            return (null, $"Segment {index}: {ex.Message}");
+        }
+    }
+
+    private static void AddRotationNotes(BookCandidate candidate, IReadOnlyList<string> attempts)
+    {
+        if (attempts is null || attempts.Count <= 1)
+        {
+            return;
+        }
+
+        var labels = attempts
+            .Select((_, attemptIndex) => attemptIndex switch
+            {
+                0 => "0°",
+                1 => "90°",
+                2 => "270°",
+                _ => "other"
+            })
+            .ToArray();
+
+        candidate.Notes.Add("OCR tried rotations: " + string.Join(", ", labels));
     }
 }
