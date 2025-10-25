@@ -7,6 +7,7 @@ using BookshelfReader.Core.Abstractions;
 using BookshelfReader.Core.Models;
 using BookshelfReader.Core.Options;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
@@ -68,45 +69,104 @@ public static class BookshelfReaderEndpointRouteBuilderExtensions
         IOptions<SegmentationOptions> segmentationOptions,
         CancellationToken cancellationToken)
     {
-        if (!request.HasFormContentType)
+        var uploadValidation = await ValidateImageUploadAsync(request, uploadsOptions.Value, cancellationToken)
+            .ConfigureAwait(false);
+        if (!uploadValidation.IsSuccess)
         {
-            return CreateValidationProblem("Content-Type", "multipart/form-data content type required.");
+            return uploadValidation.Problem!;
         }
 
-        var options = uploadsOptions.Value;
-        var form = await request.ReadFormAsync(cancellationToken).ConfigureAwait(false);
-        var file = form.Files.GetFile("image");
+        var file = uploadValidation.File!;
+        var canonicalContentType = uploadValidation.CanonicalContentType!;
 
+        await using var imageStream = file.OpenReadStream(uploadsOptions.Value.MaxBytes);
+
+        var signatureValidation = await ValidateImageSignatureAsync(imageStream, canonicalContentType, cancellationToken)
+            .ConfigureAwait(false);
+        if (signatureValidation is not null)
+        {
+            return signatureValidation;
+        }
+
+        var metadataValidation = ValidateImageMetadata(imageStream, segmentationOptions.Value);
+        if (metadataValidation is not null)
+        {
+            return metadataValidation;
+        }
+
+        try
+        {
+            var result = await processor.ProcessAsync(imageStream, cancellationToken).ConfigureAwait(false);
+            return TypedResults.Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return CreateValidationProblem("image", ex.Message);
+        }
+    }
+
+    private static async Task<UploadValidationResult> ValidateImageUploadAsync(
+        HttpRequest request,
+        UploadsOptions options,
+        CancellationToken cancellationToken)
+    {
+        if (!request.HasFormContentType)
+        {
+            return UploadValidationResult.Failure("Content-Type", "multipart/form-data content type required.");
+        }
+
+        IFormCollection form;
+        try
+        {
+            form = await request.ReadFormAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (InvalidDataException)
+        {
+            return UploadValidationResult.Failure("image", "Unable to read the uploaded form data.");
+        }
+
+        var file = form.Files.GetFile("image");
         if (file is null)
         {
-            return CreateValidationProblem("image", "Form field 'image' is required.");
+            return UploadValidationResult.Failure("image", "Form field 'image' is required.");
         }
 
         if (file.Length == 0)
         {
-            return CreateValidationProblem("image", "Uploaded image is empty.");
+            return UploadValidationResult.Failure("image", "Uploaded image is empty.");
         }
 
         if (file.Length > options.MaxBytes)
         {
-            return CreateValidationProblem("image", $"Uploaded image exceeds the configured limit of {options.MaxBytes} bytes.");
+            return UploadValidationResult.Failure("image",
+                $"Uploaded image exceeds the configured limit of {options.MaxBytes} bytes.");
         }
 
-        var contentType = file.ContentType;
-        if (!UploadsOptions.TryGetCanonicalContentType(contentType, out var canonicalContentType)
+        if (!UploadsOptions.TryGetCanonicalContentType(file.ContentType, out var canonicalContentType)
             || !options.AllowedContentTypes.Contains(canonicalContentType))
         {
-            return CreateValidationProblem("image", "Unsupported image content type.");
+            return UploadValidationResult.Failure("image", "Unsupported image content type.");
         }
 
-        await using var imageStream = file.OpenReadStream(options.MaxBytes);
+        return UploadValidationResult.Success(file, canonicalContentType);
+    }
 
+    private static async Task<ValidationProblem?> ValidateImageSignatureAsync(
+        Stream imageStream,
+        string canonicalContentType,
+        CancellationToken cancellationToken)
+    {
+        imageStream.Position = 0;
         if (!await IsSupportedImageAsync(imageStream, canonicalContentType, cancellationToken).ConfigureAwait(false))
         {
             return CreateValidationProblem("image", "Uploaded image file content does not match the declared type.");
         }
 
-        var segmentation = segmentationOptions.Value;
+        return null;
+    }
+
+    private static ValidationProblem? ValidateImageMetadata(Stream imageStream, SegmentationOptions segmentation)
+    {
         imageStream.Position = 0;
         try
         {
@@ -136,15 +196,7 @@ public static class BookshelfReaderEndpointRouteBuilderExtensions
             imageStream.Position = 0;
         }
 
-        try
-        {
-            var result = await processor.ProcessAsync(imageStream, cancellationToken).ConfigureAwait(false);
-            return TypedResults.Ok(result);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return CreateValidationProblem("image", ex.Message);
-        }
+        return null;
     }
 
     private static async Task<bool> IsSupportedImageAsync(Stream stream, string contentType, CancellationToken cancellationToken)
@@ -189,5 +241,16 @@ public static class BookshelfReaderEndpointRouteBuilderExtensions
     {
         var errors = new Dictionary<string, string[]> { [key] = new[] { message } };
         return TypedResults.ValidationProblem(errors);
+    }
+
+    private sealed record UploadValidationResult(IFormFile? File, string? CanonicalContentType, ValidationProblem? Problem)
+    {
+        public bool IsSuccess => File is not null && Problem is null;
+
+        public static UploadValidationResult Success(IFormFile file, string canonicalContentType) =>
+            new(file, canonicalContentType, null);
+
+        public static UploadValidationResult Failure(string key, string message) =>
+            new(null, null, CreateValidationProblem(key, message));
     }
 }
