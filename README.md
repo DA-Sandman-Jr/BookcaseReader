@@ -102,3 +102,7 @@ The test suite currently covers the Open Library integration. Additional tests c
 * OCR tries 0°, 90°, and 270° rotations to improve recognition when spines are vertical.
 * Genre classification is rule-based today but the `IGenreClassifier` abstraction makes it easy to plug in ML/LLM classifiers later.
 * Lookup timeouts or HTTP failures are logged and surfaced as empty results rather than 5xx errors.
+
+## Dependency updates
+
+* 2025-10-25: Bumped OpenCVSharp4, Tesseract, Microsoft.Extensions.*, and test packages (xUnit, FluentAssertions, coverlet, Microsoft.NET.Test.Sdk, MockHttp) to the latest stable releases for compatibility and security maintenance.
