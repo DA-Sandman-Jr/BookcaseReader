@@ -9,5 +9,7 @@ internal sealed class ApiKeyAuthenticationOptions : AuthenticationSchemeOptions
 
     public string HeaderName { get; set; } = "X-API-Key";
 
+    public bool RequireApiKey { get; set; } = false;
+
     public IList<string> ValidKeys { get; set; } = new List<string>();
 }

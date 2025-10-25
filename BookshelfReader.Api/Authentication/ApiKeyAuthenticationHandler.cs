@@ -22,6 +22,11 @@ internal sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKey
 
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
+        if (!Options.RequireApiKey)
+        {
+            return Task.FromResult(AuthenticateResult.NoResult());
+        }
+
         if (Options.ValidKeys.Count == 0)
         {
             Logger.LogError("API key authentication is configured without any valid keys. Rejecting request.");

@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats;
@@ -33,17 +34,23 @@ public static class BookshelfReaderEndpointRouteBuilderExtensions
             .Produces<IEnumerable<BookMetadata>>(StatusCodes.Status200OK)
             .ProducesValidationProblem();
 
-        apiGroup.MapPost("/bookshelf/parse", ParseAsync)
+        var apiKeyOptions = app.ServiceProvider.GetRequiredService<IOptions<ApiKeyAuthenticationOptions>>().Value;
+
+        var parseEndpoint = apiGroup.MapPost("/bookshelf/parse", ParseAsync)
             .Accepts<IFormFile>("multipart/form-data")
             .WithName("ParseBookshelf")
             .WithTags(BookshelfTag)
             .Produces<ParseResult>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status401Unauthorized)
-            .ProducesValidationProblem()
-            .RequireAuthorization(new AuthorizeAttribute
+            .ProducesValidationProblem();
+
+        if (apiKeyOptions.RequireApiKey)
+        {
+            parseEndpoint.RequireAuthorization(new AuthorizeAttribute
             {
                 AuthenticationSchemes = ApiKeyAuthenticationDefaults.AuthenticationScheme
             });
+        }
 
         return apiGroup;
     }

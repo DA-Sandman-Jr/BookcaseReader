@@ -28,8 +28,9 @@ public static class BookshelfReaderServiceCollectionExtensions
         services.AddOptions<ApiKeyAuthenticationOptions>()
             .Bind(configuration.GetSection(ApiKeyAuthenticationOptions.SectionName))
             .Validate(options => !string.IsNullOrWhiteSpace(options.HeaderName), "API key header name must be configured.")
-            .Validate(options => options.ValidKeys is { Count: > 0 } && options.ValidKeys.All(key => !string.IsNullOrWhiteSpace(key)),
-                "At least one non-empty API key must be configured.")
+            .Validate(options => !options.RequireApiKey || options.ValidKeys is { Count: > 0 }
+                    && options.ValidKeys.All(key => !string.IsNullOrWhiteSpace(key)),
+                "At least one non-empty API key must be configured when API keys are required.")
             .ValidateOnStart();
 
         services.AddOptions<UploadsOptions>()
