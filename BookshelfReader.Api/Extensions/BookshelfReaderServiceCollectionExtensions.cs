@@ -48,7 +48,11 @@ public static class BookshelfReaderServiceCollectionExtensions
             });
 
         services.Configure<TesseractOcrOptions>(configuration.GetSection(TesseractOcrOptions.SectionName));
-        services.Configure<SegmentationOptions>(configuration.GetSection(SegmentationOptions.SectionName));
+        services.AddOptions<SegmentationOptions>()
+            .Bind(configuration.GetSection(SegmentationOptions.SectionName))
+            .Validate(options => options.MaxImagePixels is > 0 and <= 50_000_000,
+                "Segmentation:MaxImagePixels must be between 1 and 50,000,000.")
+            .ValidateOnStart();
         services.Configure<ParsingOptions>(configuration.GetSection(ParsingOptions.SectionName));
 
         services.AddSingleton<IBookSegmentationService, OpenCvBookSegmentationService>();

@@ -8,4 +8,5 @@ public sealed class SegmentationOptions
     public double MinAreaFraction { get; set; } = 0.0025;
     public double MaxAreaFraction { get; set; } = 0.9;
     public int MaxSegments { get; set; } = 64;
+    public int MaxImagePixels { get; set; } = 25_000_000;
 }

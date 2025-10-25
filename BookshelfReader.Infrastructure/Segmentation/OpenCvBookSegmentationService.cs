@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using BookshelfReader.Core.Abstractions;
 using BookshelfReader.Core.Models;
@@ -38,6 +39,13 @@ public sealed class OpenCvBookSegmentationService : IBookSegmentationService
         {
             _logger.LogWarning("Unable to decode uploaded image for segmentation");
             return Array.Empty<BookSegment>();
+        }
+
+        var pixelCount = (long)sourceMat.Width * sourceMat.Height;
+        if (pixelCount > _options.MaxImagePixels)
+        {
+            throw new InvalidOperationException(
+                $"Uploaded image has {pixelCount:N0} pixels which exceeds the configured limit of {_options.MaxImagePixels:N0}.");
         }
 
         using var gray = new Mat();
