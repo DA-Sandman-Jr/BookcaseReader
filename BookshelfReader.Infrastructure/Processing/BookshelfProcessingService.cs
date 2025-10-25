@@ -36,27 +36,41 @@ public sealed class BookshelfProcessingService : IBookshelfProcessingService
         var segments = await _segmentationService.SegmentAsync(imageStream, cancellationToken).ConfigureAwait(false);
         _logger.LogInformation("Segmentation produced {Count} segments for image {ImageId}", segments.Count, imageId);
         var books = new List<BookCandidate>();
+        var diagnosticNotes = new List<string>();
 
-        foreach (var segment in segments)
+        for (var index = 0; index < segments.Count; index++)
         {
+            var segment = segments[index];
             cancellationToken.ThrowIfCancellationRequested();
 
-            var ocrResult = await _ocrService.RecognizeAsync(segment.ImageData, cancellationToken).ConfigureAwait(false);
-            var parsed = _parsingService.Parse(segment, ocrResult);
-            parsed.Genres = _genreClassifier.Classify(parsed.Title, parsed.RawText).ToList();
-
-            if (ocrResult.Attempts.Count > 1)
+            try
             {
-                parsed.Notes.Add("OCR tried rotations: " + string.Join(", ", ocrResult.Attempts.Select((_, index) => index switch
-                {
-                    0 => "0°",
-                    1 => "90°",
-                    2 => "270°",
-                    _ => "other"
-                })));
-            }
+                var ocrResult = await _ocrService.RecognizeAsync(segment.ImageData, cancellationToken).ConfigureAwait(false);
+                var parsed = _parsingService.Parse(segment, ocrResult);
+                parsed.Genres = _genreClassifier.Classify(parsed.Title, parsed.RawText).ToList();
 
-            books.Add(parsed);
+                if (ocrResult.Attempts.Count > 1)
+                {
+                    parsed.Notes.Add("OCR tried rotations: " + string.Join(", ", ocrResult.Attempts.Select((_, attemptIndex) => attemptIndex switch
+                    {
+                        0 => "0°",
+                        1 => "90°",
+                        2 => "270°",
+                        _ => "other"
+                    })));
+                }
+
+                books.Add(parsed);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to process segment {SegmentIndex} for image {ImageId}", index, imageId);
+                diagnosticNotes.Add($"Segment {index}: {ex.Message}");
+            }
         }
 
         stopwatch.Stop();
@@ -68,7 +82,8 @@ public sealed class BookshelfProcessingService : IBookshelfProcessingService
             Diagnostics = new Diagnostics
             {
                 SegmentCount = segments.Count,
-                ElapsedMs = stopwatch.ElapsedMilliseconds
+                ElapsedMs = stopwatch.ElapsedMilliseconds,
+                Notes = diagnosticNotes
             }
         };
     }
