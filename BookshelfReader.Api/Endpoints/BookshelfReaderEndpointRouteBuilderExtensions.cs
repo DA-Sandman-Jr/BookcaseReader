@@ -1,3 +1,4 @@
+using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
@@ -10,6 +11,8 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Options;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats;
 
 namespace BookshelfReader.Api.Endpoints;
 
@@ -62,6 +65,7 @@ public static class BookshelfReaderEndpointRouteBuilderExtensions
         HttpRequest request,
         IBookshelfProcessingService processor,
         IOptions<UploadsOptions> uploadsOptions,
+        IOptions<SegmentationOptions> segmentationOptions,
         CancellationToken cancellationToken)
     {
         if (!request.HasFormContentType)
@@ -102,8 +106,45 @@ public static class BookshelfReaderEndpointRouteBuilderExtensions
             return CreateValidationProblem("image", "Uploaded image file content does not match the declared type.");
         }
 
-        var result = await processor.ProcessAsync(imageStream, cancellationToken).ConfigureAwait(false);
-        return TypedResults.Ok(result);
+        var segmentation = segmentationOptions.Value;
+        imageStream.Position = 0;
+        try
+        {
+            var imageInfo = Image.Identify(imageStream);
+            if (imageInfo is null)
+            {
+                return CreateValidationProblem("image", "Unable to read the uploaded image metadata.");
+            }
+
+            var pixelCount = (long)imageInfo.Width * imageInfo.Height;
+            if (pixelCount > segmentation.MaxImagePixels)
+            {
+                return CreateValidationProblem("image",
+                    $"Uploaded image has {pixelCount:N0} pixels which exceeds the configured limit of {segmentation.MaxImagePixels:N0}.");
+            }
+        }
+        catch (UnknownImageFormatException)
+        {
+            return CreateValidationProblem("image", "Uploaded image is not in a supported format.");
+        }
+        catch (InvalidImageContentException)
+        {
+            return CreateValidationProblem("image", "Uploaded image could not be processed.");
+        }
+        finally
+        {
+            imageStream.Position = 0;
+        }
+
+        try
+        {
+            var result = await processor.ProcessAsync(imageStream, cancellationToken).ConfigureAwait(false);
+            return TypedResults.Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return CreateValidationProblem("image", ex.Message);
+        }
     }
 
     private static async Task<bool> IsSupportedImageAsync(Stream stream, string contentType, CancellationToken cancellationToken)

@@ -53,6 +53,27 @@ public sealed class OpenCvBookSegmentationServiceTests
             .Should().BeInAscendingOrder();
     }
 
+    [Fact]
+    public async Task SegmentAsync_ThrowsWhenImageExceedsPixelLimit()
+    {
+        var options = Options.Create(new SegmentationOptions
+        {
+            MaxImagePixels = 10_000
+        });
+
+        var logger = new TestLogger<OpenCvBookSegmentationService>();
+        var service = new OpenCvBookSegmentationService(options, logger);
+
+        using var image = new Mat(new Size(400, 400), MatType.CV_8UC3, Scalar.White);
+        Cv2.ImEncode(".png", image, out var buffer).Should().BeTrue();
+        await using var stream = new MemoryStream(buffer);
+
+        var action = async () => await service.SegmentAsync(stream, CancellationToken.None);
+
+        await action.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*pixels*");
+    }
+
     private sealed class TestLogger<T> : ILogger<T>
     {
         public List<LogEntry> Entries { get; } = new();
