@@ -95,6 +95,19 @@ dotnet test
 
 The test suite currently covers the Open Library integration. Additional tests can be added around parsing, segmentation, and orchestration using golden images or fixtures.
 
+## Release notes
+
+### 2025-10-25
+
+* Microsoft.NET.Test.Sdk → 17.10.0
+* xUnit + runner → 2.7.1 / 2.5.7
+* coverlet.collector → 6.0.2
+* RichardSzalay.MockHttp → 7.1.0
+* OpenCvSharp4 packages → 4.9.0.20240616
+* Tesseract → 5.4.0
+* Microsoft.Extensions.* dependencies → 8.0.6
+* Microsoft.AspNetCore.OpenApi → 8.0.7
+
 ## Notes
 
 * Upload validation rejects non-image content types and files over the configured size limit.
