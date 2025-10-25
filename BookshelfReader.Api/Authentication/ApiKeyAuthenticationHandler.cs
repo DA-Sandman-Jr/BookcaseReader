@@ -1,3 +1,5 @@
+using System;
+using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
@@ -44,9 +46,12 @@ internal sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKey
         {
             if (IsMatch(validKey, providedKey))
             {
-                var claims = new[] { new System.Security.Claims.Claim("ApiKey", Options.HeaderName) };
-                var identity = new System.Security.Claims.ClaimsIdentity(claims, Scheme.Name);
-                var principal = new System.Security.Claims.ClaimsPrincipal(identity);
+                var claims = new[]
+                {
+                    new Claim(ApiKeyAuthenticationDefaults.ApiKeyClaimType, CreateKeyIdentifier(validKey))
+                };
+                var identity = new ClaimsIdentity(claims, Scheme.Name);
+                var principal = new ClaimsPrincipal(identity);
                 var ticket = new AuthenticationTicket(principal, Scheme.Name);
                 return Task.FromResult(AuthenticateResult.Success(ticket));
             }
@@ -85,6 +90,27 @@ internal sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKey
         {
             CryptographicOperations.ZeroMemory(expectedBytes);
             CryptographicOperations.ZeroMemory(providedBytes);
+        }
+    }
+
+    private static string CreateKeyIdentifier(string key)
+    {
+        var keyBytes = Encoding.UTF8.GetBytes(key);
+        try
+        {
+            var hash = SHA256.HashData(keyBytes);
+            try
+            {
+                return Convert.ToHexString(hash);
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(hash);
+            }
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(keyBytes);
         }
     }
 }
