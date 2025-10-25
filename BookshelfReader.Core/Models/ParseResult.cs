@@ -11,4 +11,5 @@ public sealed class Diagnostics
 {
     public int SegmentCount { get; set; }
     public long ElapsedMs { get; set; }
+    public List<string> Notes { get; set; } = new();
 }
