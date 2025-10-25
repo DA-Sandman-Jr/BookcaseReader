@@ -12,7 +12,9 @@ namespace BookshelfReader.Infrastructure.Parsing;
 
 public sealed class BookParsingService : IBookParsingService
 {
-    private static readonly Regex CleanupRegex = new("[^A-Za-z0-9'&,:;\- ]", RegexOptions.Compiled);
+    private static readonly Regex CleanupRegex = new(
+        @"[^\p{L}\p{M}\p{Nd}'&,:;\- ]",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private readonly ParsingOptions _options;
     private readonly ILogger<BookParsingService> _logger;
 
@@ -162,6 +164,6 @@ public sealed class BookParsingService : IBookParsingService
             return string.Empty;
         }
 
-        return CultureInfo.CurrentCulture.TextInfo.ToTitleCase(value.ToLowerInvariant());
+        return CultureInfo.InvariantCulture.TextInfo.ToTitleCase(value.ToLowerInvariant());
     }
 }
