@@ -29,6 +29,10 @@ BookshelfReader.sln
 
 Override any value via environment variables or user secrets (e.g. `ASPNETCORE_ENVIRONMENT=Development`).
 
+## Integrating as a standalone service
+
+If you want to keep BookshelfReader deployed independently and call it from another application, follow the [BookshelfReader Integration Guide](docs/IntegrationGuide.md). It covers the API contract, configuration, deployment boundaries, and local co-development workflow.
+
 ## Running the API
 
 ```
