@@ -1,4 +1,4 @@
-namespace BookshelfReader.Api.Authentication;
+namespace BookshelfReader.DependencyInjection.Authentication;
 
 public static class ApiKeyAuthenticationDefaults
 {

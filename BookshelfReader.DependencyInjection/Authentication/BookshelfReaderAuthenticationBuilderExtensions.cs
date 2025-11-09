@@ -1,9 +1,10 @@
 using System;
 using Microsoft.AspNetCore.Authentication;
+using BookshelfReader.DependencyInjection.Authentication;
 
-namespace BookshelfReader.Api.Authentication;
+namespace Microsoft.AspNetCore.Authentication;
 
-public static class AuthenticationBuilderExtensions
+public static class BookshelfReaderAuthenticationBuilderExtensions
 {
     public static AuthenticationBuilder AddBookshelfReaderApiKey(this AuthenticationBuilder builder)
     {

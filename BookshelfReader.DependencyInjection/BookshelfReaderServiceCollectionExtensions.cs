@@ -1,6 +1,6 @@
 using System;
 using System.Linq;
-using BookshelfReader.Api.Authentication;
+using BookshelfReader.DependencyInjection.Authentication;
 using BookshelfReader.Core.Abstractions;
 using BookshelfReader.Core.Options;
 using BookshelfReader.Infrastructure.Genres;
@@ -11,10 +11,9 @@ using BookshelfReader.Infrastructure.Processing;
 using BookshelfReader.Infrastructure.Segmentation;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
-namespace BookshelfReader.Api.Extensions;
+namespace Microsoft.Extensions.DependencyInjection;
 
 public static class BookshelfReaderServiceCollectionExtensions
 {

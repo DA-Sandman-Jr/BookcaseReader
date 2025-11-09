@@ -2,7 +2,7 @@ using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
-using BookshelfReader.Api.Authentication;
+using BookshelfReader.DependencyInjection.Authentication;
 using BookshelfReader.Core.Abstractions;
 using BookshelfReader.Core.Models;
 using BookshelfReader.Core.Options;

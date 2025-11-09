@@ -47,8 +47,8 @@ Swagger UI is available at `https://localhost:5001/swagger`.
 
 If you already have an ASP.NET Core application and want to expose the bookshelf parsing endpoints from the same host:
 
-1. Reference the `BookshelfReader.Api`, `BookshelfReader.Core`, and `BookshelfReader.Infrastructure` projects from your web application.
-2. Configure services and authentication in `Program.cs` (add `using BookshelfReader.Api.Extensions;` and `using BookshelfReader.Api.Authentication;`):
+1. Reference the `BookshelfReader.DependencyInjection` project (or NuGet package) from your web application, along with the `BookshelfReader.Api` project if you want to reuse the provided endpoint mappings.
+2. Configure services and authentication in `Program.cs` (add `using BookshelfReader.Api.Extensions;` and `using BookshelfReader.DependencyInjection.Authentication;`):
 
    ```csharp
    builder.Services.AddBookshelfReader(builder.Configuration);

@@ -8,6 +8,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BookshelfReader.Core", "Boo
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BookshelfReader.Infrastructure", "BookshelfReader.Infrastructure/BookshelfReader.Infrastructure.csproj", "{A9FB6C37-7DD5-4C54-99D3-0467D1BBE5E6}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BookshelfReader.DependencyInjection", "BookshelfReader.DependencyInjection/BookshelfReader.DependencyInjection.csproj", "{71817AF5-2D7C-4DCF-A059-83F6861A0750}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BookshelfReader.Tests", "BookshelfReader.Tests/BookshelfReader.Tests.csproj", "{E2714334-F645-4038-9EE7-81CFD0B1FE8D}"
 EndProject
 Global

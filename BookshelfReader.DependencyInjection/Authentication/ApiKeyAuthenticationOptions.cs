@@ -1,11 +1,11 @@
 using System.Collections.Generic;
 using Microsoft.AspNetCore.Authentication;
 
-namespace BookshelfReader.Api.Authentication;
+namespace BookshelfReader.DependencyInjection.Authentication;
 
-internal sealed class ApiKeyAuthenticationOptions : AuthenticationSchemeOptions
+public sealed class ApiKeyAuthenticationOptions : AuthenticationSchemeOptions
 {
-    internal const string SectionName = "Authentication:ApiKey";
+    public const string SectionName = "Authentication:ApiKey";
 
     public string HeaderName { get; set; } = "X-API-Key";
 
