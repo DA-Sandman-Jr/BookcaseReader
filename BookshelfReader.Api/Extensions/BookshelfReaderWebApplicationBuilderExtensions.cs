@@ -1,7 +1,7 @@
 using System;
 using System.Threading.Tasks;
-using BookshelfReader.DependencyInjection.Authentication;
 using BookshelfReader.Api.Endpoints;
+using BookshelfReader.DependencyInjection.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;

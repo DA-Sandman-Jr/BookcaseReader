@@ -1,12 +1,12 @@
+using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Text.Json;
 using BookshelfReader.Core.Models.External;
 using BookshelfReader.Infrastructure.Lookup;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using RichardSzalay.MockHttp;
-using System.Net;
-using System.Net.Http;
-using System.Text.Json;
-using System.Linq;
 
 namespace BookshelfReader.Tests.Lookup;
 
