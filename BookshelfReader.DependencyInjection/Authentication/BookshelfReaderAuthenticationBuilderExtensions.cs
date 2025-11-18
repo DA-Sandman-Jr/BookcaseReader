@@ -1,6 +1,6 @@
 using System;
-using Microsoft.AspNetCore.Authentication;
 using BookshelfReader.DependencyInjection.Authentication;
+using Microsoft.AspNetCore.Authentication;
 
 namespace Microsoft.AspNetCore.Authentication;
 

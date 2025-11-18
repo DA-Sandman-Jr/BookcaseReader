@@ -1,8 +1,8 @@
 using System;
 using System.Linq;
-using BookshelfReader.DependencyInjection.Authentication;
 using BookshelfReader.Core.Abstractions;
 using BookshelfReader.Core.Options;
+using BookshelfReader.DependencyInjection.Authentication;
 using BookshelfReader.Infrastructure.Genres;
 using BookshelfReader.Infrastructure.Lookup;
 using BookshelfReader.Infrastructure.Ocr;
