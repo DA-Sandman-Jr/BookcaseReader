@@ -163,47 +163,47 @@ public static class BookshelfReaderEndpointRouteBuilderExtensions
         string canonicalContentType,
         CancellationToken cancellationToken)
     {
-        imageStream.Position = 0;
-        if (!await IsSupportedImageAsync(imageStream, canonicalContentType, cancellationToken).ConfigureAwait(false))
+        return await WithStreamRewindAsync(imageStream, async () =>
         {
-            return CreateValidationProblem("image", "Uploaded image file content does not match the declared type.");
-        }
+            var isSupported = await IsSupportedImageAsync(imageStream, canonicalContentType, cancellationToken)
+                .ConfigureAwait(false);
 
-        return null;
+            return isSupported
+                ? null
+                : CreateValidationProblem("image", "Uploaded image file content does not match the declared type.");
+        }).ConfigureAwait(false);
     }
 
     private static ValidationProblem? ValidateImageMetadata(Stream imageStream, SegmentationOptions segmentation)
     {
-        imageStream.Position = 0;
-        try
+        return WithStreamRewind(imageStream, () =>
         {
-            var imageInfo = Image.Identify(imageStream);
-            if (imageInfo is null)
+            try
             {
-                return CreateValidationProblem("image", "Unable to read the uploaded image metadata.");
+                var imageInfo = Image.Identify(imageStream);
+                if (imageInfo is null)
+                {
+                    return CreateValidationProblem("image", "Unable to read the uploaded image metadata.");
+                }
+
+                var pixelCount = (long)imageInfo.Width * imageInfo.Height;
+                if (pixelCount > segmentation.MaxImagePixels)
+                {
+                    return CreateValidationProblem("image",
+                        $"Uploaded image has {pixelCount:N0} pixels which exceeds the configured limit of {segmentation.MaxImagePixels:N0}.");
+                }
+            }
+            catch (UnknownImageFormatException)
+            {
+                return CreateValidationProblem("image", "Uploaded image is not in a supported format.");
+            }
+            catch (InvalidImageContentException)
+            {
+                return CreateValidationProblem("image", "Uploaded image could not be processed.");
             }
 
-            var pixelCount = (long)imageInfo.Width * imageInfo.Height;
-            if (pixelCount > segmentation.MaxImagePixels)
-            {
-                return CreateValidationProblem("image",
-                    $"Uploaded image has {pixelCount:N0} pixels which exceeds the configured limit of {segmentation.MaxImagePixels:N0}.");
-            }
-        }
-        catch (UnknownImageFormatException)
-        {
-            return CreateValidationProblem("image", "Uploaded image is not in a supported format.");
-        }
-        catch (InvalidImageContentException)
-        {
-            return CreateValidationProblem("image", "Uploaded image could not be processed.");
-        }
-        finally
-        {
-            imageStream.Position = 0;
-        }
-
-        return null;
+            return null;
+        });
     }
 
     private static async Task<bool> IsSupportedImageAsync(Stream stream, string contentType, CancellationToken cancellationToken)
@@ -218,25 +218,15 @@ public static class BookshelfReaderEndpointRouteBuilderExtensions
 
         try
         {
-            stream.Position = 0;
             var bytesRead = await stream.ReadAsync(buffer.AsMemory(0, signatureSpan.Length), cancellationToken)
                 .ConfigureAwait(false);
-            stream.Position = 0;
 
             if (bytesRead < signatureSpan.Length)
             {
                 return false;
             }
 
-            for (var i = 0; i < signatureSpan.Length; i++)
-            {
-                if (buffer[i] != signatureSpan[i])
-                {
-                    return false;
-                }
-            }
-
-            return true;
+            return buffer.AsSpan(0, signatureSpan.Length).SequenceEqual(signatureSpan);
         }
         finally
         {
@@ -248,6 +238,32 @@ public static class BookshelfReaderEndpointRouteBuilderExtensions
     {
         var errors = new Dictionary<string, string[]> { [key] = new[] { message } };
         return TypedResults.ValidationProblem(errors);
+    }
+
+    private static async Task<T> WithStreamRewindAsync<T>(Stream stream, Func<Task<T>> action)
+    {
+        stream.Position = 0;
+        try
+        {
+            return await action().ConfigureAwait(false);
+        }
+        finally
+        {
+            stream.Position = 0;
+        }
+    }
+
+    private static T WithStreamRewind<T>(Stream stream, Func<T> action)
+    {
+        stream.Position = 0;
+        try
+        {
+            return action();
+        }
+        finally
+        {
+            stream.Position = 0;
+        }
     }
 
     private sealed record UploadValidationResult(IFormFile? File, string? CanonicalContentType, ValidationProblem? Problem)
