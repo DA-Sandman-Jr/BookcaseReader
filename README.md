@@ -1,56 +1,15 @@
 # BookshelfReader
 
-BookshelfReader is a .NET 8 Web API that turns a raw bookshelf photo into structured book metadata. The service segments books using OpenCV, performs OCR with Tesseract, parses probable titles/authors, classifies genres using keyword rules, and enriches metadata via the public Open Library catalog.
+BookshelfReader provides dependency injection helpers for wiring the bookshelf parsing pipeline (segmentation, OCR, parsing, genre classification, and Open Library lookup) into an existing ASP.NET Core application. Use the NuGet package; you do not need to run the included API host by itself.
 
-## Solution structure
+## Consuming the NuGet package
 
-```
-BookshelfReader.sln
-├── BookshelfReader.Api             # Minimal APIs, dependency injection, configuration
-├── BookshelfReader.Core            # Domain models, options, abstraction interfaces
-├── BookshelfReader.Infrastructure  # OpenCV segmentation, Tesseract OCR, parsing, genre classification, lookups
-└── BookshelfReader.Tests           # xUnit test suite (FluentAssertions + MockHttp)
-```
-
-## Prerequisites
-
-* .NET 8 SDK
-* Native dependencies for [OpenCvSharp4](https://github.com/shimat/opencvsharp) (the `OpenCvSharp4.runtime.anycpu` package loads the unmanaged binaries automatically on supported platforms)
-* [Tesseract OCR language data](https://github.com/tesseract-ocr/tessdata). By default the API looks for `tessdata` inside the application directory; override via `Ocr:Tesseract:DataPath` in configuration.
-
-## Configuration
-
-`BookshelfReader.Api/appsettings.json` contains sensible defaults:
-
-* **Uploads** – maximum upload size (10 MB) and allowed MIME types.
-* **OpenLibrary** – base URL for outbound metadata lookups.
-* **Ocr:Tesseract** – path to tessdata, language(s), and max OCR concurrency.
-* **Segmentation / Parsing** – heuristics for contour filtering and text parsing.
-
-Override any value via environment variables or user secrets (e.g. `ASPNETCORE_ENVIRONMENT=Development`).
-
-## Integrating as a standalone service
-
-If you want to keep BookshelfReader deployed independently and call it from another application, follow the [BookshelfReader Integration Guide](docs/IntegrationGuide.md). It covers the API contract, configuration, deployment boundaries, and local co-development workflow.
-
-## Running the API
-
-```
-dotnet restore
-cd BookshelfReader.Api
-dotnet run
-```
-
-Swagger UI is available at `https://localhost:5001/swagger`.
-
-## Adding the endpoints to an existing ASP.NET Core app
-
-If you already have an ASP.NET Core application and want to expose the bookshelf parsing endpoints from the same host:
-
-1. Reference the `BookshelfReader.DependencyInjection` project (or NuGet package) from your web application, along with the `BookshelfReader.Api` project if you want to reuse the provided endpoint mappings.
-2. Configure services and authentication in `Program.cs` (add `using BookshelfReader.Api.Extensions;` and `using BookshelfReader.DependencyInjection.Authentication;`):
-
+1. Reference the `BookshelfReader.DependencyInjection` package (and `BookshelfReader.Api` if you want the prebuilt endpoint mappings) from your ASP.NET Core project.
+2. In `Program.cs` add:
    ```csharp
+   using BookshelfReader.Api.Extensions;
+   using BookshelfReader.DependencyInjection.Authentication;
+
    builder.Services.AddBookshelfReader(builder.Configuration);
 
    builder.Services
@@ -63,59 +22,31 @@ If you already have an ASP.NET Core application and want to expose the bookshelf
        .AddBookshelfReaderApiKey();
 
    builder.Services.AddAuthorization();
-   ```
 
-3. Map the endpoints alongside your existing routes:
-
-   ```csharp
    app.MapBookshelfReaderApi();
    ```
+3. Provide configuration values (environment variables or `appsettings.json`):
+   * `Authentication:ApiKey`: `HeaderName` (default `X-API-Key`), `RequireApiKey`, and `ValidKeys`.
+   * `Uploads`: `MaxBytes` (1–20 MB) and `AllowedContentTypes` (JPEG/PNG).
+   * Optional: `OpenLibrary:BaseUrl` (must be HTTPS), `Ocr:Tesseract`, `Segmentation`, and `Parsing` settings.
 
-4. Copy the `Authentication`, `Uploads`, and other relevant sections from `BookshelfReader.Api/appsettings.json` into your application's configuration so the options binding succeeds. At least one non-empty API key must be provided before startup.
+## Packing for nuget.org (testing)
 
-The `AddBookshelfReader` extension wires up the OCR/segmentation pipeline, validation rules, HTTP client for metadata lookup, and multipart upload limits. The `MapBookshelfReaderApi` extension registers the `/api/books/lookup` and `/api/bookshelf/parse` routes so you can expose them from any existing minimal API or MVC host.
-
-### Sample requests
-
-Parse a bookshelf image:
-
+```bash
+dotnet restore
+dotnet pack BookshelfReader.DependencyInjection/BookshelfReader.DependencyInjection.csproj \
+  -c Release \
+  -p:PackageVersion=1.0.0-beta1 \
+  -p:IncludeSymbols=true \
+  -p:SymbolPackageFormat=snupkg
 ```
-curl -X POST "https://localhost:5001/api/bookshelf/parse" \
-  -H "accept: application/json" \
-  -F "image=@/path/to/bookshelf.jpg"
-```
 
-Lookup metadata via Open Library:
-
-```
-curl "https://localhost:5001/api/books/lookup?name=the%20hobbit"
-```
+Publish the resulting `.nupkg` (and optional `.snupkg`) to nuget.org with your API key. Mark prerelease versions with a suffix such as `-beta1`.
 
 ## Tests
 
-```
+```bash
 dotnet test
 ```
 
-The test suite currently covers the Open Library integration. Additional tests can be added around parsing, segmentation, and orchestration using golden images or fixtures.
-
-## Release notes
-
-### 2025-10-25
-
-* Microsoft.NET.Test.Sdk → 17.10.0
-* xUnit + runner → 2.7.1 / 2.5.7
-* coverlet.collector → 6.0.2
-* RichardSzalay.MockHttp → 7.1.0
-* OpenCvSharp4 packages → 4.9.0.20240616
-* Tesseract → 5.4.0
-* Microsoft.Extensions.* dependencies → 8.0.6
-* Microsoft.AspNetCore.OpenApi → 8.0.7
-
-## Notes
-
-* Upload validation rejects non-image content types and files over the configured size limit.
-* Segmentation uses grayscale → blur → Canny → morphology to find spine contours, deskews via `minAreaRect`, and crops each book before OCR.
-* OCR tries 0°, 90°, and 270° rotations to improve recognition when spines are vertical.
-* Genre classification is rule-based today but the `IGenreClassifier` abstraction makes it easy to plug in ML/LLM classifiers later.
-* Lookup timeouts or HTTP failures are logged and surfaced as empty results rather than 5xx errors.
+Tests cover the DI wiring, option validation, and pipeline components to ensure the NuGet surface behaves as expected.
