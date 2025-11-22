@@ -12,6 +12,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BookshelfReader.DependencyI
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BookshelfReader.Tests", "BookshelfReader.Tests/BookshelfReader.Tests.csproj", "{E2714334-F645-4038-9EE7-81CFD0B1FE8D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BookshelfReader.Host", "BookshelfReader.Host/BookshelfReader.Host.csproj", "{771BCD31-4EB0-419D-8DA5-050CAF8567D5}"
+EndProject
 Global
     GlobalSection(SolutionConfigurationPlatforms) = preSolution
         Debug|Any CPU = Debug|Any CPU
@@ -34,6 +36,10 @@ Global
         {E2714334-F645-4038-9EE7-81CFD0B1FE8D}.Debug|Any CPU.Build.0 = Debug|Any CPU
         {E2714334-F645-4038-9EE7-81CFD0B1FE8D}.Release|Any CPU.ActiveCfg = Release|Any CPU
         {E2714334-F645-4038-9EE7-81CFD0B1FE8D}.Release|Any CPU.Build.0 = Release|Any CPU
+        {771BCD31-4EB0-419D-8DA5-050CAF8567D5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+        {771BCD31-4EB0-419D-8DA5-050CAF8567D5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+        {771BCD31-4EB0-419D-8DA5-050CAF8567D5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+        {771BCD31-4EB0-419D-8DA5-050CAF8567D5}.Release|Any CPU.Build.0 = Release|Any CPU
     EndGlobalSection
     GlobalSection(SolutionProperties) = preSolution
         HideSolutionNode = FALSE

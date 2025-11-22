@@ -9,11 +9,11 @@ This guide explains how to consume the BookshelfReader service from another web 
 | Scenario | Command |
 | --- | --- |
 | Restore dependencies | `dotnet restore`
-| Local development server | `dotnet run --project BookshelfReader.Api`
+| Local development server | `dotnet run --project BookshelfReader.Host`
 | Test suite | `dotnet test`
-| Production build artifact | `dotnet publish BookshelfReader.Api -c Release`
+| Production build artifact | `dotnet publish BookshelfReader.Host -c Release`
 
-Running `dotnet run --project BookshelfReader.Api` starts Kestrel on the default HTTPS port (`https://localhost:5001`) and HTTP port (`http://localhost:5000`). Swagger UI is automatically exposed in Development.
+Running `dotnet run --project BookshelfReader.Host` starts Kestrel on the default HTTPS port (`https://localhost:5001`) and HTTP port (`http://localhost:5000`). Swagger UI is automatically exposed in Development.
 
 ### HTTP endpoints
 
@@ -52,7 +52,7 @@ Requests that violate validation (missing file, unsupported MIME type, OCR failu
 
 ## 2. Configuration & secrets
 
-Configuration lives in `BookshelfReader.Api/appsettings.json` with environment-specific overrides in `appsettings.<Environment>.json`. Every option is also bindable via environment variables, which is the preferred mechanism for production secrets.
+Configuration lives in `BookshelfReader.Host/appsettings.json` with environment-specific overrides in `appsettings.<Environment>.json`. Every option is also bindable via environment variables, which is the preferred mechanism for production secrets.
 
 | Setting | Description | Environment variable example |
 | --- | --- | --- |
@@ -103,7 +103,7 @@ BookshelfReader does not ship standalone UI assets. The recommended integration 
 ## 5. Local co-development workflow
 
 1. Clone your main site repo and this repo side by side.
-2. Start BookshelfReader: `dotnet run --project BookshelfReader.Api` (or rely on the defaults).
+2. Start BookshelfReader: `dotnet run --project BookshelfReader.Host` (or rely on the defaults).
 3. Start your host site on a different port (e.g., `https://localhost:7000`).
 4. Configure the host to call BookshelfReader by setting an environment variable such as `BOOKSHELF_READER_BASE_URL=https://localhost:5001`.
 5. For browser-based integration, either:
