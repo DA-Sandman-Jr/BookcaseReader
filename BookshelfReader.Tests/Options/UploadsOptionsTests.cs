@@ -15,6 +15,16 @@ public class UploadsOptionsTests
     }
 
     [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void TryGetCanonicalContentType_ReturnsFalse_ForMissingValues(string? input)
+    {
+        UploadContentTypeHelper.TryGetCanonicalContentType(input, out var canonical).Should().BeFalse();
+        canonical.Should().BeEmpty();
+    }
+
+    [Theory]
     [InlineData("image/jpeg")]
     [InlineData("image/jpg")]
     [InlineData("image/pjpeg")]
@@ -56,8 +66,8 @@ public class UploadsOptionsTests
     [Fact]
     public void TryGetImageSignature_ReturnsSameSignature_ForAliases()
     {
-        UploadsOptions.TryGetImageSignature("image/jpg", out var aliasSignature).Should().BeTrue();
-        UploadsOptions.TryGetImageSignature("image/jpeg", out var canonicalSignature).Should().BeTrue();
+        UploadContentTypeHelper.TryGetImageSignature("image/jpg", out var aliasSignature).Should().BeTrue();
+        UploadContentTypeHelper.TryGetImageSignature("image/jpeg", out var canonicalSignature).Should().BeTrue();
 
         aliasSignature.ToArray().Should().Equal(canonicalSignature.ToArray());
     }

@@ -1,7 +1,4 @@
-using System;
 using System.Security.Claims;
-using System.Security.Cryptography;
-using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Logging;
@@ -49,11 +46,11 @@ internal sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKey
 
         foreach (var validKey in Options.ValidKeys)
         {
-            if (IsMatch(validKey, providedKey))
+            if (ApiKeyValidator.IsMatch(validKey, providedKey))
             {
                 var claims = new[]
                 {
-                    new Claim(ApiKeyAuthenticationDefaults.ApiKeyClaimType, CreateKeyIdentifier(validKey))
+                    new Claim(ApiKeyAuthenticationDefaults.ApiKeyClaimType, ApiKeyValidator.CreateKeyIdentifier(validKey))
                 };
                 var identity = new ClaimsIdentity(claims, Scheme.Name);
                 var principal = new ClaimsPrincipal(identity);
@@ -66,56 +63,4 @@ internal sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKey
         return Task.FromResult(AuthenticateResult.Fail("Invalid API key."));
     }
 
-    private static bool IsMatch(string? expectedKey, string providedKey)
-    {
-        if (string.IsNullOrWhiteSpace(expectedKey) || string.IsNullOrEmpty(providedKey))
-        {
-            return false;
-        }
-
-        var expectedBytes = Encoding.UTF8.GetBytes(expectedKey);
-        var providedBytes = Encoding.UTF8.GetBytes(providedKey);
-
-        try
-        {
-            var expectedHash = SHA256.HashData(expectedBytes);
-            var providedHash = SHA256.HashData(providedBytes);
-
-            try
-            {
-                return CryptographicOperations.FixedTimeEquals(expectedHash, providedHash);
-            }
-            finally
-            {
-                CryptographicOperations.ZeroMemory(expectedHash);
-                CryptographicOperations.ZeroMemory(providedHash);
-            }
-        }
-        finally
-        {
-            CryptographicOperations.ZeroMemory(expectedBytes);
-            CryptographicOperations.ZeroMemory(providedBytes);
-        }
-    }
-
-    private static string CreateKeyIdentifier(string key)
-    {
-        var keyBytes = Encoding.UTF8.GetBytes(key);
-        try
-        {
-            var hash = SHA256.HashData(keyBytes);
-            try
-            {
-                return Convert.ToHexString(hash);
-            }
-            finally
-            {
-                CryptographicOperations.ZeroMemory(hash);
-            }
-        }
-        finally
-        {
-            CryptographicOperations.ZeroMemory(keyBytes);
-        }
-    }
 }
