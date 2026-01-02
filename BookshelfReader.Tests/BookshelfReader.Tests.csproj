@@ -17,5 +17,6 @@
     <ProjectReference Include="..\BookshelfReader.Core\BookshelfReader.Core.csproj" />
     <ProjectReference Include="..\BookshelfReader.Infrastructure\BookshelfReader.Infrastructure.csproj" />
     <ProjectReference Include="..\BookshelfReader.DependencyInjection\BookshelfReader.DependencyInjection.csproj" />
+    <ProjectReference Include="..\BookshelfReader.Api\BookshelfReader.Api.csproj" />
   </ItemGroup>
 </Project>
