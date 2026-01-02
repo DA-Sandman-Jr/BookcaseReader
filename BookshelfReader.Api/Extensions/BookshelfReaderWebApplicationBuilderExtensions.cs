@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using BookshelfReader.Api.Endpoints;
+using BookshelfReader.Api.Validation;
 using BookshelfReader.DependencyInjection.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -28,6 +29,8 @@ public static class BookshelfReaderWebApplicationBuilderExtensions
 
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddSwaggerGen();
+
+        builder.Services.AddSingleton<IImageUploadValidator, ImageUploadValidator>();
 
         return builder;
     }
