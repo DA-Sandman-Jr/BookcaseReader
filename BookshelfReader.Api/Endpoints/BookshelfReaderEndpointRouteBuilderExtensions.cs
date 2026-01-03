@@ -28,6 +28,7 @@ public static class BookshelfReaderEndpointRouteBuilderExtensions
             .WithName("LookupBooks")
             .WithTags(BooksTag)
             .Produces<IEnumerable<BookMetadata>>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable)
             .ProducesValidationProblem();
 
         var apiKeyOptions = app.ServiceProvider.GetRequiredService<IOptions<ApiKeyAuthenticationOptions>>().Value;
@@ -51,7 +52,7 @@ public static class BookshelfReaderEndpointRouteBuilderExtensions
         return apiGroup;
     }
 
-    private static async Task<Results<Ok<IEnumerable<BookMetadata>>, ValidationProblem>> LookupAsync(
+    private static async Task<Results<Ok<IEnumerable<BookMetadata>>, ProblemHttpResult, ValidationProblem>> LookupAsync(
         string name,
         IBookLookupService lookupService,
         CancellationToken cancellationToken)
@@ -61,43 +62,34 @@ public static class BookshelfReaderEndpointRouteBuilderExtensions
             return CreateValidationProblem("name", "Query 'name' is required.");
         }
 
-        var books = await lookupService.LookupAsync(name, cancellationToken).ConfigureAwait(false);
-        return TypedResults.Ok(books);
+        var result = await lookupService.LookupAsync(name, cancellationToken).ConfigureAwait(false);
+
+        if (!result.IsSuccess)
+        {
+            return TypedResults.Problem(
+                title: "Book lookup failed",
+                detail: result.ErrorMessage,
+                statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
+
+        return TypedResults.Ok(result.Books);
     }
 
     private static async Task<Results<Ok<ParseResult>, ValidationProblem>> ParseAsync(
         HttpRequest request,
         IBookshelfProcessingService processor,
-        IImageUploadValidator imageUploadValidator,
+        IImageUploadRequestHandler uploadRequestHandler,
         CancellationToken cancellationToken)
     {
-        var uploadValidation = await imageUploadValidator.ValidateImageUploadAsync(request, cancellationToken)
+        var preparationResult = await uploadRequestHandler.PrepareAsync(request, cancellationToken)
             .ConfigureAwait(false);
-        if (!uploadValidation.IsSuccess)
+
+        if (!preparationResult.IsSuccess)
         {
-            return uploadValidation.Problem!;
+            return preparationResult.Problem!;
         }
 
-        var file = uploadValidation.File!;
-        var canonicalContentType = uploadValidation.CanonicalContentType!;
-
-        await using var imageStream = file.OpenReadStream(uploadValidation.MaxBytes);
-
-        var signatureValidation = await imageUploadValidator.ValidateImageSignatureAsync(
-                imageStream,
-                canonicalContentType,
-                cancellationToken)
-            .ConfigureAwait(false);
-        if (signatureValidation is not null)
-        {
-            return signatureValidation;
-        }
-
-        var metadataValidation = imageUploadValidator.ValidateImageMetadata(imageStream);
-        if (metadataValidation is not null)
-        {
-            return metadataValidation;
-        }
+        await using var imageStream = preparationResult.Upload!.Stream;
 
         try
         {

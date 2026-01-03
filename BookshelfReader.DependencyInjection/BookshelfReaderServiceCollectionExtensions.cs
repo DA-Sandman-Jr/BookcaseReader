@@ -59,6 +59,7 @@ public static class BookshelfReaderServiceCollectionExtensions
         services.AddSingleton<IOcrService, TesseractOcrService>();
         services.AddSingleton<IBookParsingService, BookParsingService>();
         services.AddSingleton<IGenreClassifier, KeywordGenreClassifier>();
+        services.AddSingleton<IBookSegmentProcessor, BookSegmentProcessor>();
         services.AddSingleton<IBookshelfProcessingService, BookshelfProcessingService>();
 
         services.AddHttpClient<IBookLookupService, OpenLibraryLookupService>((_, client) =>

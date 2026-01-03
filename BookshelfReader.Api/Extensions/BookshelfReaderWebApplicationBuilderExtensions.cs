@@ -31,6 +31,7 @@ public static class BookshelfReaderWebApplicationBuilderExtensions
         builder.Services.AddSwaggerGen();
 
         builder.Services.AddSingleton<IImageUploadValidator, ImageUploadValidator>();
+        builder.Services.AddSingleton<IImageUploadRequestHandler, ImageUploadRequestHandler>();
 
         return builder;
     }
