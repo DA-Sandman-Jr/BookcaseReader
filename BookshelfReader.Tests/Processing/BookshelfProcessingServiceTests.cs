@@ -18,19 +18,15 @@ public class BookshelfProcessingServiceTests
         };
 
         var segmentationService = new StubSegmentationService(segments);
-        var ocrService = new SequenceOcrService(new Func<OcrResult>[]
+        var segmentProcessor = new SequenceSegmentProcessor(new[]
         {
-            () => new OcrResult { Text = "First", Attempts = new[] { "0" } },
-            () => throw new InvalidOperationException("boom")
+            new SegmentProcessingResult(new BookCandidate { Title = "First" }, Array.Empty<string>()),
+            SegmentProcessingResult.Failure("boom")
         });
-        var parsingService = new StubParsingService();
-        var genreClassifier = new StubGenreClassifier();
 
         var service = new BookshelfProcessingService(
             segmentationService,
-            ocrService,
-            parsingService,
-            genreClassifier,
+            segmentProcessor,
             NullLogger<BookshelfProcessingService>.Instance);
 
         using var stream = new MemoryStream();
@@ -55,42 +51,23 @@ public class BookshelfProcessingServiceTests
             => Task.FromResult(_segments);
     }
 
-    private sealed class SequenceOcrService : IOcrService
+    private sealed class SequenceSegmentProcessor : IBookSegmentProcessor
     {
-        private readonly Queue<Func<OcrResult>> _results;
+        private readonly Queue<SegmentProcessingResult> _results;
 
-        public SequenceOcrService(IEnumerable<Func<OcrResult>> results)
+        public SequenceSegmentProcessor(IEnumerable<SegmentProcessingResult> results)
         {
-            _results = new Queue<Func<OcrResult>>(results);
+            _results = new Queue<SegmentProcessingResult>(results);
         }
 
-        public Task<OcrResult> RecognizeAsync(byte[] imageData, CancellationToken cancellationToken = default)
+        public Task<SegmentProcessingResult> ProcessAsync(BookSegment segment, int index, Guid imageId, CancellationToken cancellationToken)
         {
             if (_results.Count == 0)
             {
-                throw new InvalidOperationException("No OCR results configured.");
+                throw new InvalidOperationException("No segment results configured.");
             }
 
-            cancellationToken.ThrowIfCancellationRequested();
-            var next = _results.Dequeue();
-            return Task.FromResult(next());
+            return Task.FromResult(_results.Dequeue());
         }
-    }
-
-    private sealed class StubParsingService : IBookParsingService
-    {
-        public BookCandidate Parse(BookSegment segment, OcrResult ocr)
-            => new()
-            {
-                BoundingBox = segment.BoundingBox,
-                Title = ocr.Text,
-                RawText = ocr.Text
-            };
-    }
-
-    private sealed class StubGenreClassifier : IGenreClassifier
-    {
-        public IReadOnlyList<string> Classify(string title, string rawText)
-            => Array.Empty<string>();
     }
 }

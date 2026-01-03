@@ -17,11 +17,11 @@ public sealed class OpenLibraryLookupService : IBookLookupService
         _logger = logger;
     }
 
-    public async Task<IEnumerable<BookMetadata>> LookupAsync(string query, CancellationToken cancellationToken = default)
+    public async Task<BookLookupResult> LookupAsync(string query, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(query))
         {
-            return Enumerable.Empty<BookMetadata>();
+            return BookLookupResult.Success(Array.Empty<BookMetadata>());
         }
 
         try
@@ -32,10 +32,10 @@ public sealed class OpenLibraryLookupService : IBookLookupService
 
             if (response?.Docs is null || response.Docs.Count == 0)
             {
-                return Enumerable.Empty<BookMetadata>();
+                return BookLookupResult.Success(Array.Empty<BookMetadata>());
             }
 
-            return response.Docs
+            var books = response.Docs
                 .OrderByDescending(d => d.FirstPublishYear ?? 0)
                 .Take(5)
                 .Select(d => new BookMetadata
@@ -49,15 +49,17 @@ public sealed class OpenLibraryLookupService : IBookLookupService
                         : null
                 })
                 .ToArray();
+
+            return BookLookupResult.Success(books);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            return Enumerable.Empty<BookMetadata>();
+            throw;
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Open Library lookup failed for query '{Query}'", query);
-            return Enumerable.Empty<BookMetadata>();
+            return BookLookupResult.Failure("Unable to reach the book lookup service. Please try again later.");
         }
     }
 }

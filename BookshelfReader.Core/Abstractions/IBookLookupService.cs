@@ -4,5 +4,5 @@ namespace BookshelfReader.Core.Abstractions;
 
 public interface IBookLookupService
 {
-    Task<IEnumerable<BookMetadata>> LookupAsync(string query, CancellationToken cancellationToken = default);
+    Task<BookLookupResult> LookupAsync(string query, CancellationToken cancellationToken = default);
 }

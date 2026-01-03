@@ -68,6 +68,7 @@ public sealed class ImageUploadValidator : IImageUploadValidator
         string canonicalContentType,
         CancellationToken cancellationToken)
     {
+        EnsureSeekable(imageStream);
         return await WithStreamRewindAsync(imageStream, async () =>
         {
             var isSupported = await IsSupportedImageAsync(imageStream, canonicalContentType, cancellationToken)
@@ -81,6 +82,7 @@ public sealed class ImageUploadValidator : IImageUploadValidator
 
     public ValidationProblem? ValidateImageMetadata(Stream imageStream)
     {
+        EnsureSeekable(imageStream);
         return WithStreamRewind(imageStream, () =>
         {
             try
@@ -168,6 +170,14 @@ public sealed class ImageUploadValidator : IImageUploadValidator
         finally
         {
             stream.Position = 0;
+        }
+    }
+
+    private static void EnsureSeekable(Stream stream)
+    {
+        if (!stream.CanSeek)
+        {
+            throw new InvalidOperationException("Image validation requires a seekable stream.");
         }
     }
 }
