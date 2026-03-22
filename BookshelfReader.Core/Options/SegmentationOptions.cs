@@ -9,4 +9,7 @@ public sealed class SegmentationOptions
     public double MaxAreaFraction { get; set; } = 0.9;
     public int MaxSegments { get; set; } = 64;
     public int MaxImagePixels { get; set; } = 25_000_000;
+    public int GaussianKernelSize { get; set; } = 5;
+    public double CannyThreshold1 { get; set; } = 30;
+    public double CannyThreshold2 { get; set; } = 120;
 }

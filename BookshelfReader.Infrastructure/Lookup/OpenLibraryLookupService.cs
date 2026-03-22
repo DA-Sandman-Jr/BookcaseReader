@@ -17,6 +17,8 @@ public sealed class OpenLibraryLookupService : IBookLookupService
         _logger = logger;
     }
 
+    private const int MaxRetries = 3;
+
     public async Task<BookLookupResult> LookupAsync(string query, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(query))
@@ -24,42 +26,53 @@ public sealed class OpenLibraryLookupService : IBookLookupService
             return BookLookupResult.Success(Array.Empty<BookMetadata>());
         }
 
-        try
-        {
-            var response = await _httpClient.GetFromJsonAsync<OpenLibrarySearchResult>(
-                $"search.json?title={Uri.EscapeDataString(query)}",
-                cancellationToken);
+        var requestUri = $"search.json?title={Uri.EscapeDataString(query)}";
 
-            if (response?.Docs is null || response.Docs.Count == 0)
+        for (var attempt = 0; attempt < MaxRetries; attempt++)
+        {
+            if (attempt > 0)
             {
-                return BookLookupResult.Success(Array.Empty<BookMetadata>());
+                var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt));
+                _logger.LogDebug("Retrying Open Library lookup (attempt {Attempt}/{Max}) after {Delay}s", attempt + 1, MaxRetries, delay.TotalSeconds);
+                await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
             }
 
-            var books = response.Docs
-                .OrderByDescending(d => d.FirstPublishYear ?? 0)
-                .Take(5)
-                .Select(d => new BookMetadata
-                {
-                    Title = d.Title ?? string.Empty,
-                    Author = d.AuthorName?.FirstOrDefault(),
-                    PublishYear = d.FirstPublishYear,
-                    Isbn = d.Isbn?.FirstOrDefault(),
-                    CoverUrl = d.CoverId.HasValue
-                        ? $"https://covers.openlibrary.org/b/id/{d.CoverId}-M.jpg"
-                        : null
-                })
-                .ToArray();
+            try
+            {
+                var response = await _httpClient.GetFromJsonAsync<OpenLibrarySearchResult>(requestUri, cancellationToken).ConfigureAwait(false);
 
-            return BookLookupResult.Success(books);
+                if (response?.Docs is null || response.Docs.Count == 0)
+                {
+                    return BookLookupResult.Success(Array.Empty<BookMetadata>());
+                }
+
+                var books = response.Docs
+                    .OrderByDescending(d => d.FirstPublishYear ?? 0)
+                    .Take(5)
+                    .Select(d => new BookMetadata
+                    {
+                        Title = d.Title ?? string.Empty,
+                        Author = d.AuthorName?.FirstOrDefault() ?? string.Empty,
+                        PublishYear = d.FirstPublishYear,
+                        Isbn = d.Isbn?.FirstOrDefault(),
+                        CoverUrl = d.CoverId.HasValue
+                            ? $"https://covers.openlibrary.org/b/id/{d.CoverId}-M.jpg"
+                            : null
+                    })
+                    .ToArray();
+
+                return BookLookupResult.Success(books);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Open Library lookup failed for query '{Query}' (attempt {Attempt}/{Max})", query, attempt + 1, MaxRetries);
+            }
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Open Library lookup failed for query '{Query}'", query);
-            return BookLookupResult.Failure("Unable to reach the book lookup service. Please try again later.");
-        }
+
+        return BookLookupResult.Failure("Unable to reach the book lookup service. Please try again later.");
     }
 }
