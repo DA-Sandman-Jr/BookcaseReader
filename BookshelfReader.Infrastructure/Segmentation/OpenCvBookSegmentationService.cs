@@ -53,11 +53,12 @@ public sealed class OpenCvBookSegmentationService : IBookSegmentationService
         cancellationToken.ThrowIfCancellationRequested();
 
         using var blurred = new Mat();
-        Cv2.GaussianBlur(gray, blurred, new Size(5, 5), 0);
+        var kernelSize = _options.GaussianKernelSize | 1; // ensure odd
+        Cv2.GaussianBlur(gray, blurred, new Size(kernelSize, kernelSize), 0);
         cancellationToken.ThrowIfCancellationRequested();
 
         using var edges = new Mat();
-        Cv2.Canny(blurred, edges, 30, 120);
+        Cv2.Canny(blurred, edges, _options.CannyThreshold1, _options.CannyThreshold2);
         cancellationToken.ThrowIfCancellationRequested();
 
         using var kernel = Cv2.GetStructuringElement(MorphShapes.Rect, new Size(5, 5));

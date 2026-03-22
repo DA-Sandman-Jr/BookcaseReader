@@ -17,6 +17,8 @@ public sealed class TesseractOcrService : IOcrService, IDisposable
     private readonly SemaphoreSlim _semaphore;
     private readonly string _dataPath;
     private readonly string _language;
+    private readonly int _maxEngines;
+    private int _engineCount;
     private bool _disposed;
 
     public TesseractOcrService(IOptions<TesseractOcrOptions> options, ILogger<TesseractOcrService> logger)
@@ -35,11 +37,13 @@ public sealed class TesseractOcrService : IOcrService, IDisposable
         }
 
         var parallelism = Math.Max(1, _options.MaxDegreeOfParallelism);
+        _maxEngines = parallelism;
         _semaphore = new SemaphoreSlim(parallelism, parallelism);
 
         for (var i = 0; i < parallelism; i++)
         {
             _enginePool.Add(CreateEngine());
+            _engineCount++;
         }
     }
 
@@ -54,11 +58,25 @@ public sealed class TesseractOcrService : IOcrService, IDisposable
 
         await _semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
         TesseractEngine? engine = null;
+        bool returnToPool = true;
         try
         {
             if (!_enginePool.TryTake(out engine))
             {
-                engine = CreateEngine();
+                // The semaphore should guarantee the pool always has an engine available.
+                // If we reach this path something went wrong; cap growth at the configured max.
+                var newCount = Interlocked.Increment(ref _engineCount);
+                if (newCount <= _maxEngines)
+                {
+                    engine = CreateEngine();
+                }
+                else
+                {
+                    Interlocked.Decrement(ref _engineCount);
+                    _logger.LogWarning("OCR engine pool exhausted unexpectedly at concurrency limit {Max}; creating temporary engine", _maxEngines);
+                    engine = CreateEngine();
+                    returnToPool = false;
+                }
             }
 
             using var pix = Pix.LoadFromMemory(imageData);
@@ -108,7 +126,10 @@ public sealed class TesseractOcrService : IOcrService, IDisposable
         {
             if (engine is not null)
             {
-                _enginePool.Add(engine);
+                if (returnToPool)
+                    _enginePool.Add(engine);
+                else
+                    engine.Dispose();
             }
             _semaphore.Release();
         }

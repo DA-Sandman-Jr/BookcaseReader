@@ -16,6 +16,7 @@ public sealed class DiagnosticsBuilder
 
     public void AddNotes(IEnumerable<string> notes)
     {
+        ArgumentNullException.ThrowIfNull(notes);
         _notes.AddRange(notes);
     }
 
