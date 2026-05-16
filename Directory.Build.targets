@@ -1,0 +1,49 @@
+<Project>
+  <PropertyGroup>
+    <SyncAgentInstructionsFromClaudeEnabled Condition="'$(SyncAgentInstructionsFromClaudeEnabled)' == ''">true</SyncAgentInstructionsFromClaudeEnabled>
+  </PropertyGroup>
+
+  <UsingTask
+    TaskName="SyncAgentInstructions"
+    TaskFactory="RoslynCodeTaskFactory"
+    AssemblyFile="$(MSBuildToolsPath)/Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <Sources ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Code Type="Fragment" Language="cs">
+        <![CDATA[
+        const string header = "> **Auto-generated from `CLAUDE.md`** - edit the sibling `CLAUDE.md` instead. Changes made directly to this file will be overwritten on the next build by `Directory.Build.targets`.";
+        foreach (var item in Sources)
+        {
+            var source = item.ItemSpec;
+            var destDir = System.IO.Path.GetDirectoryName(source);
+            if (string.IsNullOrEmpty(destDir)) continue;
+            var dest = System.IO.Path.Combine(destDir, "AGENTS.md");
+            var sourceText = System.IO.File.ReadAllText(source);
+            var newContent = header + System.Environment.NewLine + System.Environment.NewLine + sourceText;
+            var existing = System.IO.File.Exists(dest) ? System.IO.File.ReadAllText(dest) : null;
+            if (existing != newContent)
+            {
+                System.IO.File.WriteAllText(dest, newContent);
+                Log.LogMessage(MessageImportance.Normal, "Synced " + dest);
+            }
+        }
+        ]]>
+      </Code>
+    </Task>
+  </UsingTask>
+
+  <Target Name="SyncAgentInstructionsFromClaude"
+          BeforeTargets="PrepareForBuild"
+          Condition="'$(SyncAgentInstructionsFromClaudeEnabled)' == 'true' and '$(MSBuildProjectName)' == 'BookshelfReader.Api'">
+    <ItemGroup>
+      <ClaudeInstructionFiles Include="$(MSBuildThisFileDirectory)**\CLAUDE.md"
+                              Exclude="$(MSBuildThisFileDirectory).git\**;$(MSBuildThisFileDirectory).vs\**;$(MSBuildThisFileDirectory)bin\**;$(MSBuildThisFileDirectory)obj\**" />
+    </ItemGroup>
+
+    <Message Text="Syncing AGENTS.md files from CLAUDE.md files."
+             Importance="High" />
+    <SyncAgentInstructions Sources="@(ClaudeInstructionFiles)" />
+  </Target>
+</Project>
