@@ -21,7 +21,17 @@
             if (string.IsNullOrEmpty(destDir)) continue;
             var dest = System.IO.Path.Combine(destDir, "AGENTS.md");
             var sourceText = System.IO.File.ReadAllText(source);
-            var newContent = header + System.Environment.NewLine + System.Environment.NewLine + sourceText;
+            var agentsText = System.Text.RegularExpressions.Regex.Replace(
+                sourceText,
+                @"`AGENTS\.md` files are auto-generated from sibling `CLAUDE\.md` on build via `Directory\.Build\.targets`\. Edit the `CLAUDE\.md`, not the `AGENTS\.md`\.",
+                "`AGENTS.md` files are auto-generated on build via `Directory.Build.targets`; see the generated header for the source file to edit.",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            agentsText = System.Text.RegularExpressions.Regex.Replace(
+                agentsText,
+                "CLAUDE\\.md",
+                "AGENTS.md",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            var newContent = header + System.Environment.NewLine + System.Environment.NewLine + agentsText;
             var existing = System.IO.File.Exists(dest) ? System.IO.File.ReadAllText(dest) : null;
             if (existing != newContent)
             {
