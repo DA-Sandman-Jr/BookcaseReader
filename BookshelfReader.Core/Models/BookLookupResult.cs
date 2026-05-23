@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace BookshelfReader.Core.Models;
 
 public sealed record BookLookupResult(IEnumerable<BookMetadata> Books, string? ErrorMessage)

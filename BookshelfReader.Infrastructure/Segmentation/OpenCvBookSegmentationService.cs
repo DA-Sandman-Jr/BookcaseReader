@@ -1,5 +1,3 @@
-using System;
-using System.Linq;
 using BookshelfReader.Core.Abstractions;
 using BookshelfReader.Core.Models;
 using BookshelfReader.Core.Options;
@@ -26,14 +24,14 @@ public sealed class OpenCvBookSegmentationService : IBookSegmentationService
 
         using var ms = new MemoryStream();
         await imageStream.CopyToAsync(ms, cancellationToken).ConfigureAwait(false);
-        var data = ms.ToArray();
+        byte[] data = ms.ToArray();
 
         if (data.Length == 0)
         {
             return Array.Empty<BookSegment>();
         }
 
-        using var sourceMat = Cv2.ImDecode(data, ImreadModes.Color);
+        using Mat sourceMat = Cv2.ImDecode(data, ImreadModes.Color);
         cancellationToken.ThrowIfCancellationRequested();
         if (sourceMat.Empty())
         {
@@ -41,7 +39,7 @@ public sealed class OpenCvBookSegmentationService : IBookSegmentationService
             return Array.Empty<BookSegment>();
         }
 
-        var pixelCount = (long)sourceMat.Width * sourceMat.Height;
+        long pixelCount = (long)sourceMat.Width * sourceMat.Height;
         if (pixelCount > _options.MaxImagePixels)
         {
             throw new InvalidOperationException(
@@ -53,7 +51,7 @@ public sealed class OpenCvBookSegmentationService : IBookSegmentationService
         cancellationToken.ThrowIfCancellationRequested();
 
         using var blurred = new Mat();
-        var kernelSize = _options.GaussianKernelSize | 1; // ensure odd
+        int kernelSize = _options.GaussianKernelSize | 1; // ensure odd
         Cv2.GaussianBlur(gray, blurred, new Size(kernelSize, kernelSize), 0);
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -61,12 +59,12 @@ public sealed class OpenCvBookSegmentationService : IBookSegmentationService
         Cv2.Canny(blurred, edges, _options.CannyThreshold1, _options.CannyThreshold2);
         cancellationToken.ThrowIfCancellationRequested();
 
-        using var kernel = Cv2.GetStructuringElement(MorphShapes.Rect, new Size(5, 5));
+        using Mat kernel = Cv2.GetStructuringElement(MorphShapes.Rect, new Size(5, 5));
         using var closed = new Mat();
         Cv2.MorphologyEx(edges, closed, MorphTypes.Close, kernel, iterations: 2);
         cancellationToken.ThrowIfCancellationRequested();
 
-        Cv2.FindContours(closed, out var contours, out _, RetrievalModes.External, ContourApproximationModes.ApproxSimple);
+        Cv2.FindContours(closed, out Point[][]? contours, out _, RetrievalModes.External, ContourApproximationModes.ApproxSimple);
         cancellationToken.ThrowIfCancellationRequested();
 
         if (contours.Length == 0)
@@ -81,36 +79,36 @@ public sealed class OpenCvBookSegmentationService : IBookSegmentationService
         cancellationToken.ThrowIfCancellationRequested();
 
         var segments = new List<BookSegment>();
-        var imageArea = sourceMat.Width * sourceMat.Height;
+        int imageArea = sourceMat.Width * sourceMat.Height;
 
         foreach (var item in orderedContours)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var contour = item.Contour;
-            var rect = item.Rect;
+            Point[] contour = item.Contour;
+            OpenCvSharp.Rect rect = item.Rect;
 
             if (rect.Width <= 0 || rect.Height <= 0)
             {
                 continue;
             }
 
-            var area = rect.Width * rect.Height;
-            var areaFraction = area / (double)imageArea;
+            int area = rect.Width * rect.Height;
+            double areaFraction = area / (double)imageArea;
             if (areaFraction < _options.MinAreaFraction || areaFraction > _options.MaxAreaFraction)
             {
                 continue;
             }
 
-            var aspectRatio = rect.Width / (double)rect.Height;
+            double aspectRatio = rect.Width / (double)rect.Height;
             if (aspectRatio < _options.MinAspectRatio || aspectRatio > _options.MaxAspectRatio)
             {
                 continue;
             }
 
-            var rotatedRect = Cv2.MinAreaRect(contour);
-            var angle = rotatedRect.Angle;
-            var size = rotatedRect.Size;
+            RotatedRect rotatedRect = Cv2.MinAreaRect(contour);
+            float angle = rotatedRect.Angle;
+            Size2f size = rotatedRect.Size;
 
             if (size.Width < size.Height)
             {
@@ -118,7 +116,7 @@ public sealed class OpenCvBookSegmentationService : IBookSegmentationService
                 size = new Size2f(size.Height, size.Width);
             }
 
-            var rotationMatrix = Cv2.GetRotationMatrix2D(rotatedRect.Center, angle, 1.0);
+            Mat rotationMatrix = Cv2.GetRotationMatrix2D(rotatedRect.Center, angle, 1.0);
             using var rotatedImage = new Mat();
             Cv2.WarpAffine(sourceMat, rotatedImage, rotationMatrix, sourceMat.Size(), InterpolationFlags.Linear, BorderTypes.Replicate);
             cancellationToken.ThrowIfCancellationRequested();
@@ -129,7 +127,7 @@ public sealed class OpenCvBookSegmentationService : IBookSegmentationService
                 (int)Math.Round(size.Width),
                 (int)Math.Round(size.Height));
 
-            cropRect = cropRect & new OpenCvSharp.Rect(0, 0, rotatedImage.Width, rotatedImage.Height);
+            cropRect &= new OpenCvSharp.Rect(0, 0, rotatedImage.Width, rotatedImage.Height);
             if (cropRect.Width <= 0 || cropRect.Height <= 0)
             {
                 continue;
@@ -141,13 +139,13 @@ public sealed class OpenCvBookSegmentationService : IBookSegmentationService
                 continue;
             }
 
-            if (!Cv2.ImEncode(".png", cropped, out var buffer))
+            if (!Cv2.ImEncode(".png", cropped, out byte[]? buffer))
             {
                 continue;
             }
             cancellationToken.ThrowIfCancellationRequested();
 
-            var boundingBox = new Rect(rect.X, rect.Y, rect.Width, rect.Height);
+            var boundingBox = new BookshelfReader.Core.Models.Rect(rect.X, rect.Y, rect.Width, rect.Height);
             segments.Add(new BookSegment
             {
                 BoundingBox = boundingBox,

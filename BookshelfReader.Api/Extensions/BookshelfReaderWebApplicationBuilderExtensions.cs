@@ -1,12 +1,12 @@
-using System;
-using System.Threading.Tasks;
 using BookshelfReader.Api.Endpoints;
 using BookshelfReader.Api.Validation;
+using BookshelfReader.DependencyInjection;
 using BookshelfReader.DependencyInjection.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace BookshelfReader.Api.Extensions;
 
@@ -70,7 +70,7 @@ public static class BookshelfReaderWebApplicationBuilderExtensions
     {
         context.Response.OnStarting(() =>
         {
-            var headers = context.Response.Headers;
+            IHeaderDictionary headers = context.Response.Headers;
             headers["X-Content-Type-Options"] = "nosniff";
             headers["X-Frame-Options"] = "DENY";
             headers["Referrer-Policy"] = "no-referrer";

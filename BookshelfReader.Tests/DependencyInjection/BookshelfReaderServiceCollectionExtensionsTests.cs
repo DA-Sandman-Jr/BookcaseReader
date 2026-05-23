@@ -1,6 +1,5 @@
-using System;
-using System.Collections.Generic;
 using BookshelfReader.Core.Abstractions;
+using BookshelfReader.DependencyInjection;
 using BookshelfReader.DependencyInjection.Authentication;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
@@ -15,7 +14,7 @@ public class BookshelfReaderServiceCollectionExtensionsTests
     [Fact]
     public void AddBookshelfReader_RegistersExpectedServices()
     {
-        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        IConfigurationRoot configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["Authentication:ApiKey:RequireApiKey"] = "false",
             ["Uploads:MaxBytes"] = "1048576",
@@ -38,7 +37,7 @@ public class BookshelfReaderServiceCollectionExtensionsTests
     [Fact]
     public void AddBookshelfReader_InvalidUploadsOptions_ThrowsValidationException()
     {
-        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        IConfigurationRoot configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["Uploads:MaxBytes"] = "25000000", // 25 MB exceeds allowed maximum
             ["Uploads:AllowedContentTypes:0"] = "image/jpeg"
@@ -47,7 +46,7 @@ public class BookshelfReaderServiceCollectionExtensionsTests
         var services = new ServiceCollection();
         services.AddBookshelfReader(configuration);
 
-        var provider = services.BuildServiceProvider();
+        ServiceProvider provider = services.BuildServiceProvider();
 
         Action act = () => provider.GetRequiredService<IOptions<BookshelfReader.Core.Options.UploadsOptions>>().Value.ToString();
 
@@ -58,7 +57,7 @@ public class BookshelfReaderServiceCollectionExtensionsTests
     [Fact]
     public void AddBookshelfReader_RequiresApiKeyWithoutKeys_ThrowsValidationException()
     {
-        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        IConfigurationRoot configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["Authentication:ApiKey:RequireApiKey"] = "true",
             ["Authentication:ApiKey:HeaderName"] = "X-API-Key"
@@ -67,7 +66,7 @@ public class BookshelfReaderServiceCollectionExtensionsTests
         var services = new ServiceCollection();
         services.AddBookshelfReader(configuration);
 
-        var provider = services.BuildServiceProvider();
+        ServiceProvider provider = services.BuildServiceProvider();
 
         Action act = () => provider.GetRequiredService<IOptions<ApiKeyAuthenticationOptions>>().Value.RequireApiKey.ToString();
 
@@ -78,7 +77,7 @@ public class BookshelfReaderServiceCollectionExtensionsTests
     [Fact]
     public void AddBookshelfReader_RejectsNonHttpsOpenLibraryBaseUrl()
     {
-        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        IConfigurationRoot configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["OpenLibrary:BaseUrl"] = "http://example.com/"
         }).Build();
@@ -86,7 +85,7 @@ public class BookshelfReaderServiceCollectionExtensionsTests
         var services = new ServiceCollection();
         services.AddBookshelfReader(configuration);
 
-        var provider = services.BuildServiceProvider();
+        ServiceProvider provider = services.BuildServiceProvider();
 
         Action act = () => provider.GetRequiredService<IBookLookupService>();
 

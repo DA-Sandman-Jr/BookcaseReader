@@ -33,8 +33,8 @@ public sealed class KeywordGenreClassifier : IGenreClassifier
             return;
         }
 
-        var words = text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
-        foreach (var (keyword, genre) in KeywordToGenre)
+        string[] words = text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+        foreach ((string? keyword, string? genre) in KeywordToGenre)
         {
             if (words.Any(w => string.Equals(w, keyword, StringComparison.OrdinalIgnoreCase)))
             {

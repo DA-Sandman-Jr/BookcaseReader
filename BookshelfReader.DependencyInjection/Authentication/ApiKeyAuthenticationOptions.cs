@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using Microsoft.AspNetCore.Authentication;
 
 namespace BookshelfReader.DependencyInjection.Authentication;

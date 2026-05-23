@@ -3,8 +3,9 @@ using BookshelfReader.Core.Options;
 using BookshelfReader.Infrastructure.Parsing;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using Xunit;
+
+using OptionsFactory = Microsoft.Extensions.Options.Options;
 
 namespace BookshelfReader.Tests.Parsing;
 
@@ -13,7 +14,7 @@ public class BookParsingServiceTests
     [Fact]
     public void Parse_PreservesAccentedCharacters()
     {
-        var service = CreateService();
+        BookParsingService service = CreateService();
         var segment = new BookSegment { BoundingBox = new Rect(0, 0, 10, 10) };
         var ocr = new OcrResult
         {
@@ -21,7 +22,7 @@ public class BookParsingServiceTests
             Confidence = 0.8
         };
 
-        var result = service.Parse(segment, ocr);
+        BookCandidate result = service.Parse(segment, ocr);
 
         result.Title.Should().Be("Cien Años De Soledad");
         result.Author.Should().Be("Gabriel García Márquez");
@@ -30,7 +31,7 @@ public class BookParsingServiceTests
     [Fact]
     public void Parse_PreservesNonLatinLetters()
     {
-        var service = CreateService();
+        BookParsingService service = CreateService();
         var segment = new BookSegment { BoundingBox = new Rect(0, 0, 10, 10) };
         var ocr = new OcrResult
         {
@@ -38,7 +39,7 @@ public class BookParsingServiceTests
             Confidence = 0.5
         };
 
-        var result = service.Parse(segment, ocr);
+        BookCandidate result = service.Parse(segment, ocr);
 
         result.Title.Should().Be("百年孤独");
         result.Author.Should().BeEmpty();
@@ -47,7 +48,7 @@ public class BookParsingServiceTests
     [Fact]
     public void Parse_TrimsPunctuationWhileKeepingLetters()
     {
-        var service = CreateService();
+        BookParsingService service = CreateService();
         var segment = new BookSegment { BoundingBox = new Rect(0, 0, 10, 10) };
         var ocr = new OcrResult
         {
@@ -55,7 +56,7 @@ public class BookParsingServiceTests
             Confidence = 0.75
         };
 
-        var result = service.Parse(segment, ocr);
+        BookCandidate result = service.Parse(segment, ocr);
 
         result.Title.Should().Be("Les Misérables");
         result.Author.Should().Be("Victor Hugo");
@@ -64,11 +65,11 @@ public class BookParsingServiceTests
     [Fact]
     public void Parse_ReturnsZeroConfidenceAndNote_WhenTextIsEmpty()
     {
-        var service = CreateService();
+        BookParsingService service = CreateService();
         var segment = new BookSegment { BoundingBox = new Rect(0, 0, 10, 10) };
         var ocr = new OcrResult { Text = string.Empty, Confidence = 0.9 };
 
-        var result = service.Parse(segment, ocr);
+        BookCandidate result = service.Parse(segment, ocr);
 
         result.Confidence.Should().Be(0);
         result.Notes.Should().ContainSingle().Which.Should().Be("OCR returned no text");
@@ -79,11 +80,11 @@ public class BookParsingServiceTests
     [Fact]
     public void Parse_ReturnsZeroConfidence_WhenLinesCannotBeParsed()
     {
-        var service = CreateService();
+        BookParsingService service = CreateService();
         var segment = new BookSegment { BoundingBox = new Rect(0, 0, 10, 10) };
         var ocr = new OcrResult { Text = "!!! @@@ ###", Confidence = 0.6 };
 
-        var result = service.Parse(segment, ocr);
+        BookCandidate result = service.Parse(segment, ocr);
 
         result.Confidence.Should().Be(0);
         result.Notes.Should().ContainSingle().Which.Should().Be("Unable to parse OCR lines");
@@ -94,7 +95,7 @@ public class BookParsingServiceTests
     [Fact]
     public void Parse_ExtractsAuthorUsingCommonToken()
     {
-        var service = CreateService();
+        BookParsingService service = CreateService();
         var segment = new BookSegment { BoundingBox = new Rect(0, 0, 10, 10) };
         var ocr = new OcrResult
         {
@@ -102,7 +103,7 @@ public class BookParsingServiceTests
             Confidence = 0.85
         };
 
-        var result = service.Parse(segment, ocr);
+        BookCandidate result = service.Parse(segment, ocr);
 
         result.Title.Should().Be("The Great Gatsby");
         result.Author.Should().Be("F. Scott Fitzgerald");
@@ -111,7 +112,7 @@ public class BookParsingServiceTests
     [Fact]
     public void Parse_AddsAlternativeTitleNote_WhenCloseMatchExists()
     {
-        var service = CreateService();
+        BookParsingService service = CreateService();
         var segment = new BookSegment { BoundingBox = new Rect(0, 0, 10, 10) };
         var ocr = new OcrResult
         {
@@ -119,7 +120,7 @@ public class BookParsingServiceTests
             Confidence = 0.7
         };
 
-        var result = service.Parse(segment, ocr);
+        BookCandidate result = service.Parse(segment, ocr);
 
         result.Notes.Should().Contain(n => n.StartsWith("Alternative title candidate:"));
     }
@@ -128,7 +129,7 @@ public class BookParsingServiceTests
     public void Parse_CalculatesConfidenceFromTextLengthAuthorAndOcrScore()
     {
         var options = new ParsingOptions { BaseConfidence = 0.3 };
-        var service = CreateService(options);
+        BookParsingService service = CreateService(options);
         var segment = new BookSegment { BoundingBox = new Rect(0, 0, 10, 10) };
         var ocr = new OcrResult
         {
@@ -136,7 +137,7 @@ public class BookParsingServiceTests
             Confidence = 0.8
         };
 
-        var result = service.Parse(segment, ocr);
+        BookCandidate result = service.Parse(segment, ocr);
 
         result.Confidence.Should().BeApproximately(0.85, 0.0001);
     }
@@ -144,7 +145,7 @@ public class BookParsingServiceTests
     private static BookParsingService CreateService(ParsingOptions? options = null)
     {
         return new BookParsingService(
-            Options.Create(options ?? new ParsingOptions()),
+            OptionsFactory.Create(options ?? new ParsingOptions()),
             NullLogger<BookParsingService>.Instance);
     }
 }

@@ -1,5 +1,15 @@
 <Project>
   <PropertyGroup>
     <IsPackable>false</IsPackable>
+    <Nullable>enable</Nullable>
+    <!-- Surface editorconfig style/naming violations at build time so CI and
+         local `dotnet build` catch drift instead of waiting for `dotnet format`. -->
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <!-- Required to make IDE0005 (remove unnecessary usings) fire at build
+         time. See https://github.com/dotnet/roslyn/issues/41640. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- Suppress "missing XML comment". We generate doc files only to enable
+         IDE0005, not to document every public member. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
 </Project>

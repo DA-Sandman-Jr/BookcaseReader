@@ -1,8 +1,6 @@
-using System;
-using BookshelfReader.DependencyInjection.Authentication;
 using Microsoft.AspNetCore.Authentication;
 
-namespace Microsoft.AspNetCore.Authentication;
+namespace BookshelfReader.DependencyInjection.Authentication;
 
 public static class BookshelfReaderAuthenticationBuilderExtensions
 {

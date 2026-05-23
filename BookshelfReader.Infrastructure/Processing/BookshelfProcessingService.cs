@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Diagnostics;
 using BookshelfReader.Core.Abstractions;
 using BookshelfReader.Core.Models;
@@ -27,16 +26,16 @@ public sealed class BookshelfProcessingService : IBookshelfProcessingService
         var stopwatch = Stopwatch.StartNew();
         var imageId = Guid.NewGuid();
 
-        var segments = await _segmentationService.SegmentAsync(imageStream, cancellationToken).ConfigureAwait(false);
+        IReadOnlyList<BookSegment> segments = await _segmentationService.SegmentAsync(imageStream, cancellationToken).ConfigureAwait(false);
         _logger.LogInformation("Segmentation produced {Count} segments for image {ImageId}", segments.Count, imageId);
         var books = new List<BookCandidate>();
         var diagnostics = new DiagnosticsBuilder(segments.Count);
 
-        for (var index = 0; index < segments.Count; index++)
+        for (int index = 0; index < segments.Count; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var segmentResult = await _segmentProcessor.ProcessAsync(
+            SegmentProcessingResult segmentResult = await _segmentProcessor.ProcessAsync(
                 segments[index],
                 index,
                 imageId,
@@ -47,7 +46,7 @@ public sealed class BookshelfProcessingService : IBookshelfProcessingService
                 books.Add(segmentResult.Candidate);
             }
 
-            diagnostics.AddNotes(segmentResult.Notes);
+            diagnostics.AddNotes(AddSegmentContext(index, segmentResult.Notes));
         }
 
         stopwatch.Stop();
@@ -60,5 +59,15 @@ public sealed class BookshelfProcessingService : IBookshelfProcessingService
             Books = books,
             Diagnostics = diagnostics.Build()
         };
+    }
+
+    private static IEnumerable<string> AddSegmentContext(int index, IEnumerable<string> notes)
+    {
+        string prefix = $"Segment {index}";
+
+        return notes.Select(note =>
+            note.StartsWith(prefix, StringComparison.Ordinal)
+                ? note
+                : $"{prefix}: {note}");
     }
 }

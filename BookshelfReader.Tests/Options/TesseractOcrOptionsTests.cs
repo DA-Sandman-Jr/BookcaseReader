@@ -1,4 +1,3 @@
-using System;
 using BookshelfReader.Core.Options;
 using FluentAssertions;
 using Xunit;

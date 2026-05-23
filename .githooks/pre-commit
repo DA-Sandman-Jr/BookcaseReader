@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# Runs `dotnet format --verify-no-changes` on the .cs files in this commit.
+# Aborts the commit if format would change anything. Run `dotnet format` and
+# re-stage to fix.
+#
+# Enable by running scripts/install-hooks.sh (or
+# `git config core.hooksPath .githooks`).
+set -euo pipefail
+
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+
+# Collect staged C# files (Added, Copied, Modified). Renamed/Deleted excluded.
+STAGED_CS=$(git diff --cached --name-only --diff-filter=ACM -- '*.cs' || true)
+
+if [ -z "$STAGED_CS" ]; then
+    exit 0
+fi
+
+# Optional dotnet activation script (Godot/Windows repos where dotnet isn't on PATH).
+if [ -f "$ROOT_DIR/scripts/activate-dotnet.sh" ]; then
+    # shellcheck source=scripts/activate-dotnet.sh
+    source "$ROOT_DIR/scripts/activate-dotnet.sh"
+fi
+
+# Pin the solution file. Godot+C# repos have a root .csproj (the Godot project)
+# AND a root .sln, which causes `dotnet format` to refuse to disambiguate. Auto-
+# discover a single .sln at the repo root so the kit is portable across repos.
+SLN_MATCHES=( "$ROOT_DIR"/*.sln )
+if [ ! -e "${SLN_MATCHES[0]}" ]; then
+    echo "[pre-commit] No .sln found at repo root — skipping format check."
+    exit 0
+fi
+SLN="${SLN_MATCHES[0]}"
+if [ "${#SLN_MATCHES[@]}" -gt 1 ]; then
+    echo "[pre-commit] Multiple .sln files at repo root; using first: $(basename "$SLN")"
+fi
+
+# `dotnet format --include` accepts space-separated paths.
+INCLUDE_ARGS=$(echo "$STAGED_CS" | tr '\n' ' ')
+
+cd "$ROOT_DIR"
+if ! dotnet format "$SLN" --include $INCLUDE_ARGS --verify-no-changes; then
+    echo
+    echo "[pre-commit] Format check failed on staged files."
+    echo "[pre-commit] Fix with:"
+    echo "    dotnet format"
+    echo "[pre-commit] Then 'git add' the changes and retry the commit."
+    exit 1
+fi

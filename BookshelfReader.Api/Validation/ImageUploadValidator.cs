@@ -1,11 +1,9 @@
 using System.Buffers;
-using System.Collections.Generic;
 using BookshelfReader.Core.Options;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.Extensions.Options;
 using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats;
 
 namespace BookshelfReader.Api.Validation;
 
@@ -37,7 +35,7 @@ public sealed class ImageUploadValidator : IImageUploadValidator
             return UploadValidationResult.Failure("image", "Unable to read the uploaded form data.");
         }
 
-        var file = form.Files.GetFile("image");
+        IFormFile? file = form.Files.GetFile("image");
         if (file is null)
         {
             return UploadValidationResult.Failure("image", "Form field 'image' is required.");
@@ -54,7 +52,7 @@ public sealed class ImageUploadValidator : IImageUploadValidator
                 $"Uploaded image exceeds the configured limit of {_uploadsOptions.MaxBytes} bytes.");
         }
 
-        if (!UploadsOptions.TryGetCanonicalContentType(file.ContentType, out var canonicalContentType)
+        if (!UploadsOptions.TryGetCanonicalContentType(file.ContentType, out string? canonicalContentType)
             || !_uploadsOptions.AllowedContentTypes.Contains(canonicalContentType))
         {
             return UploadValidationResult.Failure("image", "Unsupported image content type.");
@@ -71,7 +69,7 @@ public sealed class ImageUploadValidator : IImageUploadValidator
         EnsureSeekable(imageStream);
         return await WithStreamRewindAsync(imageStream, async () =>
         {
-            var isSupported = await IsSupportedImageAsync(imageStream, canonicalContentType, cancellationToken)
+            bool isSupported = await IsSupportedImageAsync(imageStream, canonicalContentType, cancellationToken)
                 .ConfigureAwait(false);
 
             return isSupported
@@ -87,13 +85,13 @@ public sealed class ImageUploadValidator : IImageUploadValidator
         {
             try
             {
-                var imageInfo = Image.Identify(imageStream);
+                ImageInfo? imageInfo = Image.Identify(imageStream);
                 if (imageInfo is null)
                 {
                     return CreateValidationProblem("image", "Unable to read the uploaded image metadata.");
                 }
 
-                var pixelCount = (long)imageInfo.Width * imageInfo.Height;
+                long pixelCount = (long)imageInfo.Width * imageInfo.Height;
                 if (pixelCount > _segmentationOptions.MaxImagePixels)
                 {
                     return CreateValidationProblem("image",
@@ -115,25 +113,25 @@ public sealed class ImageUploadValidator : IImageUploadValidator
 
     private static async Task<bool> IsSupportedImageAsync(Stream stream, string contentType, CancellationToken cancellationToken)
     {
-        if (!UploadsOptions.TryGetImageSignature(contentType, out var signature))
+        if (!UploadsOptions.TryGetImageSignature(contentType, out ReadOnlyMemory<byte> signature))
         {
             return false;
         }
 
-        var signatureSpan = signature.Span;
-        var buffer = ArrayPool<byte>.Shared.Rent(signatureSpan.Length);
+        byte[] signatureBytes = signature.ToArray();
+        byte[] buffer = ArrayPool<byte>.Shared.Rent(signatureBytes.Length);
 
         try
         {
-            var bytesRead = await stream.ReadAsync(buffer.AsMemory(0, signatureSpan.Length), cancellationToken)
+            int bytesRead = await stream.ReadAsync(buffer.AsMemory(0, signatureBytes.Length), cancellationToken)
                 .ConfigureAwait(false);
 
-            if (bytesRead < signatureSpan.Length)
+            if (bytesRead < signatureBytes.Length)
             {
                 return false;
             }
 
-            return buffer.AsSpan(0, signatureSpan.Length).SequenceEqual(signatureSpan);
+            return buffer.AsSpan(0, signatureBytes.Length).SequenceEqual(signatureBytes);
         }
         finally
         {

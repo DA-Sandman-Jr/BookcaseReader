@@ -3,6 +3,7 @@ using BookshelfReader.Core.Models;
 using BookshelfReader.Infrastructure.Processing;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
+using Xunit;
 
 namespace BookshelfReader.Tests.Processing;
 
@@ -30,7 +31,7 @@ public class BookshelfProcessingServiceTests
             NullLogger<BookshelfProcessingService>.Instance);
 
         using var stream = new MemoryStream();
-        var result = await service.ProcessAsync(stream);
+        ParseResult result = await service.ProcessAsync(stream);
 
         result.Books.Should().HaveCount(1);
         result.Books.Single().Title.Should().Be("First");

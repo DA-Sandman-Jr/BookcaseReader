@@ -11,7 +11,7 @@ public class KeywordGenreClassifierTests
     [Fact]
     public void Classify_ReturnsEmpty_WhenNoKeywordsMatch()
     {
-        var result = _classifier.Classify("The Old Man and the Sea", "The Old Man and the Sea");
+        IReadOnlyList<string> result = _classifier.Classify("The Old Man and the Sea", "The Old Man and the Sea");
 
         result.Should().BeEmpty();
     }
@@ -29,7 +29,7 @@ public class KeywordGenreClassifierTests
     [InlineData("biography", "Biography")]
     public void Classify_MatchesKeyword_WhenExactWordPresent(string keyword, string expectedGenre)
     {
-        var result = _classifier.Classify(keyword, string.Empty);
+        IReadOnlyList<string> result = _classifier.Classify(keyword, string.Empty);
 
         result.Should().ContainSingle().Which.Should().Be(expectedGenre);
     }
@@ -37,7 +37,7 @@ public class KeywordGenreClassifierTests
     [Fact]
     public void Classify_IsCaseInsensitive()
     {
-        var result = _classifier.Classify("DRAGON", string.Empty);
+        IReadOnlyList<string> result = _classifier.Classify("DRAGON", string.Empty);
 
         result.Should().ContainSingle().Which.Should().Be("Fantasy");
     }
@@ -46,7 +46,7 @@ public class KeywordGenreClassifierTests
     public void Classify_DoesNotMatchSubstrings()
     {
         // "love" inside "beloved" should not trigger Romance
-        var result = _classifier.Classify("The Beloved", "beloved gloves loveable");
+        IReadOnlyList<string> result = _classifier.Classify("The Beloved", "beloved gloves loveable");
 
         result.Should().BeEmpty();
     }
@@ -54,7 +54,7 @@ public class KeywordGenreClassifierTests
     [Fact]
     public void Classify_MatchesKeywordInRawText_WhenNotInTitle()
     {
-        var result = _classifier.Classify("A Dark Night", "The detective investigated the scene");
+        IReadOnlyList<string> result = _classifier.Classify("A Dark Night", "The detective investigated the scene");
 
         result.Should().ContainSingle().Which.Should().Be("Mystery");
     }
@@ -62,7 +62,7 @@ public class KeywordGenreClassifierTests
     [Fact]
     public void Classify_ReturnsMultipleGenres_WhenMultipleKeywordsPresent()
     {
-        var result = _classifier.Classify("Love and Murder", string.Empty);
+        IReadOnlyList<string> result = _classifier.Classify("Love and Murder", string.Empty);
 
         result.Should().HaveCount(2)
             .And.Contain("Romance")
@@ -72,7 +72,7 @@ public class KeywordGenreClassifierTests
     [Fact]
     public void Classify_ReturnsEmpty_WhenBothInputsAreEmpty()
     {
-        var result = _classifier.Classify(string.Empty, string.Empty);
+        IReadOnlyList<string> result = _classifier.Classify(string.Empty, string.Empty);
 
         result.Should().BeEmpty();
     }
@@ -80,7 +80,7 @@ public class KeywordGenreClassifierTests
     [Fact]
     public void Classify_ReturnsEmpty_WhenBothInputsAreWhitespace()
     {
-        var result = _classifier.Classify("   ", "\t\n");
+        IReadOnlyList<string> result = _classifier.Classify("   ", "\t\n");
 
         result.Should().BeEmpty();
     }
@@ -88,7 +88,7 @@ public class KeywordGenreClassifierTests
     [Fact]
     public void Classify_DoesNotDuplicateGenres_WhenKeywordAppearsMultipleTimes()
     {
-        var result = _classifier.Classify("Dragon", "dragon Dragon DRAGON");
+        IReadOnlyList<string> result = _classifier.Classify("Dragon", "dragon Dragon DRAGON");
 
         result.Should().ContainSingle().Which.Should().Be("Fantasy");
     }

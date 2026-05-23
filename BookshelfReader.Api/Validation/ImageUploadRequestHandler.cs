@@ -1,5 +1,5 @@
-using System;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace BookshelfReader.Api.Validation;
 
@@ -14,20 +14,20 @@ public sealed class ImageUploadRequestHandler : IImageUploadRequestHandler
 
     public async Task<UploadProcessingResult> PrepareAsync(HttpRequest request, CancellationToken cancellationToken)
     {
-        var uploadValidation = await _validator.ValidateImageUploadAsync(request, cancellationToken)
+        UploadValidationResult uploadValidation = await _validator.ValidateImageUploadAsync(request, cancellationToken)
             .ConfigureAwait(false);
         if (!uploadValidation.IsSuccess)
         {
             return new UploadProcessingResult(null, uploadValidation.Problem);
         }
 
-        var file = uploadValidation.File!;
-        var canonicalContentType = uploadValidation.CanonicalContentType!;
+        IFormFile file = uploadValidation.File!;
+        string canonicalContentType = uploadValidation.CanonicalContentType!;
 
-        var seekableStream = await CreateSeekableStreamAsync(file, uploadValidation.MaxBytes, cancellationToken)
+        Stream seekableStream = await CreateSeekableStreamAsync(file, uploadValidation.MaxBytes, cancellationToken)
             .ConfigureAwait(false);
 
-        var signatureValidation = await _validator.ValidateImageSignatureAsync(
+        ValidationProblem? signatureValidation = await _validator.ValidateImageSignatureAsync(
                 seekableStream,
                 canonicalContentType,
                 cancellationToken)
@@ -38,7 +38,7 @@ public sealed class ImageUploadRequestHandler : IImageUploadRequestHandler
             return new UploadProcessingResult(null, signatureValidation);
         }
 
-        var metadataValidation = _validator.ValidateImageMetadata(seekableStream);
+        ValidationProblem? metadataValidation = _validator.ValidateImageMetadata(seekableStream);
         if (metadataValidation is not null)
         {
             await seekableStream.DisposeAsync().ConfigureAwait(false);
@@ -51,7 +51,7 @@ public sealed class ImageUploadRequestHandler : IImageUploadRequestHandler
 
     private static async Task<Stream> CreateSeekableStreamAsync(IFormFile file, long maxBytes, CancellationToken cancellationToken)
     {
-        var stream = file.OpenReadStream(maxBytes);
+        Stream stream = file.OpenReadStream();
 
         if (stream.CanSeek)
         {

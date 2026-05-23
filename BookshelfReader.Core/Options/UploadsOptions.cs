@@ -1,11 +1,10 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-
 namespace BookshelfReader.Core.Options;
 
 public sealed class UploadsOptions
 {
+    public static IReadOnlyDictionary<string, ReadOnlyMemory<byte>> SupportedImageSignatures =>
+        UploadContentTypeHelper.SupportedImageSignatures;
+
     public static bool IsSupportedContentType(string? contentType)
     {
         return UploadContentTypeHelper.TryGetCanonicalContentType(contentType, out _);
@@ -45,7 +44,7 @@ public sealed class UploadsOptions
             _allowedContentTypes = value.Count == 0
                 ? new HashSet<string>(StringComparer.OrdinalIgnoreCase)
                 : new HashSet<string>(value
-                    .Select(contentType => TryGetCanonicalContentType(contentType, out var canonical) ? canonical : null)
+                    .Select(contentType => TryGetCanonicalContentType(contentType, out string? canonical) ? canonical : null)
                     .OfType<string>(), StringComparer.OrdinalIgnoreCase);
         }
     }

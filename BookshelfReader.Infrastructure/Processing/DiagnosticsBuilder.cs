@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using BookshelfReader.Core.Models;
 
 namespace BookshelfReader.Infrastructure.Processing;

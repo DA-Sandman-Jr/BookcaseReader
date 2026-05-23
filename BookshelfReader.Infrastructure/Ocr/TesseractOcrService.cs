@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using BookshelfReader.Core.Abstractions;
 using BookshelfReader.Core.Models;
 using BookshelfReader.Core.Options;
@@ -36,11 +35,11 @@ public sealed class TesseractOcrService : IOcrService, IDisposable
             _logger.LogWarning("Tesseract data path '{Path}' not found. OCR results may be degraded.", _dataPath);
         }
 
-        var parallelism = Math.Max(1, _options.MaxDegreeOfParallelism);
+        int parallelism = Math.Max(1, _options.MaxDegreeOfParallelism);
         _maxEngines = parallelism;
         _semaphore = new SemaphoreSlim(parallelism, parallelism);
 
-        for (var i = 0; i < parallelism; i++)
+        for (int i = 0; i < parallelism; i++)
         {
             _enginePool.Add(CreateEngine());
             _engineCount++;
@@ -65,7 +64,7 @@ public sealed class TesseractOcrService : IOcrService, IDisposable
             {
                 // The semaphore should guarantee the pool always has an engine available.
                 // If we reach this path something went wrong; cap growth at the configured max.
-                var newCount = Interlocked.Increment(ref _engineCount);
+                int newCount = Interlocked.Increment(ref _engineCount);
                 if (newCount <= _maxEngines)
                 {
                     engine = CreateEngine();
@@ -92,13 +91,13 @@ public sealed class TesseractOcrService : IOcrService, IDisposable
             string bestText = string.Empty;
             double bestConfidence = 0;
 
-            foreach (var orientation in orientations)
+            foreach ((int Angle, Func<Pix> Factory) orientation in orientations)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                using var oriented = orientation.Factory();
-                using var page = engine.Process(oriented);
-                var text = page.GetText() ?? string.Empty;
-                var confidence = page.GetMeanConfidence();
+                using Pix oriented = orientation.Factory();
+                using Page page = engine.Process(oriented);
+                string text = page.GetText() ?? string.Empty;
+                float confidence = page.GetMeanConfidence();
                 attempts.Add(text);
                 confidences.Add(confidence);
 
@@ -109,7 +108,7 @@ public sealed class TesseractOcrService : IOcrService, IDisposable
                 }
             }
 
-            var averageConfidence = confidences.Count == 0 ? 0 : confidences.Average();
+            double averageConfidence = confidences.Count == 0 ? 0 : confidences.Average();
             return new OcrResult
             {
                 Text = bestText.Trim(),
@@ -127,9 +126,13 @@ public sealed class TesseractOcrService : IOcrService, IDisposable
             if (engine is not null)
             {
                 if (returnToPool)
+                {
                     _enginePool.Add(engine);
+                }
                 else
+                {
                     engine.Dispose();
+                }
             }
             _semaphore.Release();
         }
@@ -142,7 +145,7 @@ public sealed class TesseractOcrService : IOcrService, IDisposable
             return;
         }
 
-        while (_enginePool.TryTake(out var engine))
+        while (_enginePool.TryTake(out TesseractEngine? engine))
         {
             engine.Dispose();
         }

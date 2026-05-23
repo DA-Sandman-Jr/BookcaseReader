@@ -1,5 +1,3 @@
-using System;
-using System.Linq;
 using BookshelfReader.Core.Abstractions;
 using BookshelfReader.Core.Options;
 using BookshelfReader.DependencyInjection.Authentication;
@@ -11,9 +9,10 @@ using BookshelfReader.Infrastructure.Processing;
 using BookshelfReader.Infrastructure.Segmentation;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
-namespace Microsoft.Extensions.DependencyInjection;
+namespace BookshelfReader.DependencyInjection;
 
 public static class BookshelfReaderServiceCollectionExtensions
 {
@@ -64,9 +63,9 @@ public static class BookshelfReaderServiceCollectionExtensions
 
         services.AddHttpClient<IBookLookupService, OpenLibraryLookupService>((_, client) =>
         {
-            var baseUrl = configuration["OpenLibrary:BaseUrl"] ?? "https://openlibrary.org/";
+            string baseUrl = configuration["OpenLibrary:BaseUrl"] ?? "https://openlibrary.org/";
 
-            if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var baseUri))
+            if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out Uri? baseUri))
             {
                 throw new InvalidOperationException("OpenLibrary:BaseUrl must be a valid absolute URI.");
             }

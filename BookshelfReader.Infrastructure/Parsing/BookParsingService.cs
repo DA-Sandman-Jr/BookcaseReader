@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Globalization;
 using System.Text.RegularExpressions;
 using BookshelfReader.Core.Abstractions;
@@ -13,8 +12,11 @@ namespace BookshelfReader.Infrastructure.Parsing;
 public sealed class BookParsingService : IBookParsingService
 {
     private static readonly Regex CleanupRegex = new(
-        @"[^\p{L}\p{M}\p{Nd}'&,:;\- ]",
+        @"[^\p{L}\p{M}\p{Nd}'&,:;\.\- ]",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly char[] LineSeparators = { '\r', '\n' };
+    private static readonly char[] EdgePunctuation = { '.', ',', ':', ';', '-' };
+
     private readonly ParsingOptions _options;
     private readonly ILogger<BookParsingService> _logger;
 
@@ -29,21 +31,21 @@ public sealed class BookParsingService : IBookParsingService
         ArgumentNullException.ThrowIfNull(segment);
         ArgumentNullException.ThrowIfNull(ocr);
 
-        var candidate = CreateCandidate(segment, ocr);
+        BookCandidate candidate = CreateCandidate(segment, ocr);
         if (string.IsNullOrWhiteSpace(candidate.RawText))
         {
             return HandleEmptyText(candidate, segment);
         }
 
-        var lines = NormalizeLines(candidate.RawText);
+        List<string> lines = NormalizeLines(candidate.RawText);
         if (lines.Count == 0)
         {
             return HandleUnparsableText(candidate, segment);
         }
 
-        var probableTitle = DetermineTitle(lines);
+        string probableTitle = DetermineTitle(lines);
         candidate.Title = ToTitleCase(probableTitle);
-        candidate.Author = DetermineAuthor(lines);
+        candidate.Author = DetermineAuthor(lines, probableTitle);
 
         candidate.Confidence = CalculateConfidence(candidate.Title, candidate.Author, ocr.Confidence);
         AddAlternativeTitleNotes(candidate, probableTitle, lines);
@@ -51,7 +53,7 @@ public sealed class BookParsingService : IBookParsingService
         return candidate;
     }
 
-    private BookCandidate CreateCandidate(BookSegment segment, OcrResult ocr)
+    private static BookCandidate CreateCandidate(BookSegment segment, OcrResult ocr)
     {
         return new BookCandidate
         {
@@ -79,27 +81,33 @@ public sealed class BookParsingService : IBookParsingService
     private static List<string> NormalizeLines(string text)
     {
         return text
-            .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
-            .Select(l => CleanupRegex.Replace(l, " ").Trim())
+            .Split(LineSeparators, StringSplitOptions.RemoveEmptyEntries)
+            .Select(l => CleanupRegex.Replace(l, " ").Trim().Trim(EdgePunctuation).Trim())
             .Where(l => !string.IsNullOrWhiteSpace(l))
             .Distinct()
             .ToList();
     }
 
-    private static string DetermineTitle(List<string> lines)
+    private string DetermineTitle(List<string> lines)
     {
-        return lines.OrderByDescending(l => l.Length).First();
+        var titleCandidates = lines
+            .Where(line => !ContainsAuthorToken(line))
+            .ToList();
+
+        return (titleCandidates.Count > 0 ? titleCandidates : lines)
+            .OrderByDescending(l => l.Length)
+            .First();
     }
 
-    private string DetermineAuthor(List<string> lines)
+    private string DetermineAuthor(List<string> lines, string title)
     {
-        var authorLine = FindAuthorLine(lines);
+        string authorLine = FindAuthorLine(lines, title);
         return string.IsNullOrEmpty(authorLine) ? string.Empty : ToTitleCase(authorLine);
     }
 
     private double CalculateConfidence(string title, string author, double ocrConfidence)
     {
-        var confidence = _options.BaseConfidence;
+        double confidence = _options.BaseConfidence;
 
         if (!string.IsNullOrEmpty(title))
         {
@@ -126,22 +134,21 @@ public sealed class BookParsingService : IBookParsingService
             return;
         }
 
-        var best = Process.ExtractTop(probableTitle, lines, limit: 3);
+        var best = Process.ExtractTop(probableTitle, lines, limit: 3).ToList();
         if (best.Count > 1 && best[1].Score > 90 && best[1].Value != probableTitle)
         {
             candidate.Notes.Add($"Alternative title candidate: {best[1].Value}");
         }
     }
 
-    private string FindAuthorLine(List<string> lines)
+    private string FindAuthorLine(List<string> lines, string title)
     {
-        foreach (var line in lines)
+        foreach (string line in lines)
         {
-            if (_options.CommonAuthorTokens.Any(t => line.Contains(t, StringComparison.OrdinalIgnoreCase)))
+            string? token = FindAuthorToken(line);
+            if (token is not null)
             {
-                var token = _options.CommonAuthorTokens
-                    .First(t => line.Contains(t, StringComparison.OrdinalIgnoreCase));
-                var author = line[(line.IndexOf(token, StringComparison.OrdinalIgnoreCase) + token.Length)..].Trim();
+                string author = line[(line.IndexOf(token, StringComparison.OrdinalIgnoreCase) + token.Length)..].Trim();
                 if (!string.IsNullOrEmpty(author))
                 {
                     return author;
@@ -149,12 +156,24 @@ public sealed class BookParsingService : IBookParsingService
             }
         }
 
-        var probableAuthor = lines
+        string? probableAuthor = lines
+            .Where(line => !string.Equals(line, title, StringComparison.OrdinalIgnoreCase))
             .Where(l => l.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length <= 4)
             .OrderBy(l => l.Length)
             .FirstOrDefault(l => l.Any(char.IsLetter) && l.Split(' ').All(w => w.Length <= 12));
 
         return probableAuthor ?? string.Empty;
+    }
+
+    private bool ContainsAuthorToken(string line) => FindAuthorToken(line) is not null;
+
+    private string? FindAuthorToken(string line)
+    {
+        return _options.CommonAuthorTokens
+            .OrderByDescending(token => token.Length)
+            .FirstOrDefault(token =>
+                line.StartsWith(token, StringComparison.OrdinalIgnoreCase)
+                && (line.Length == token.Length || !char.IsLetterOrDigit(line[token.Length])));
     }
 
     private static string ToTitleCase(string value)

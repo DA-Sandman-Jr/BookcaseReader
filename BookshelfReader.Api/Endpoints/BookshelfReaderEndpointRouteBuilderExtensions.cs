@@ -1,16 +1,14 @@
-using System;
-using System.Collections.Generic;
+using BookshelfReader.Api.Validation;
 using BookshelfReader.Core.Abstractions;
 using BookshelfReader.Core.Models;
-using BookshelfReader.Core.Options;
-using BookshelfReader.Api.Validation;
 using BookshelfReader.DependencyInjection.Authentication;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace BookshelfReader.Api.Endpoints;
 
@@ -22,7 +20,7 @@ public static class BookshelfReaderEndpointRouteBuilderExtensions
 
     public static RouteGroupBuilder MapBookshelfReaderApi(this IEndpointRouteBuilder app)
     {
-        var apiGroup = app.MapGroup(ApiBasePath).WithOpenApi();
+        RouteGroupBuilder apiGroup = app.MapGroup(ApiBasePath).WithOpenApi();
 
         apiGroup.MapGet("/books/lookup", LookupAsync)
             .WithName("LookupBooks")
@@ -31,9 +29,9 @@ public static class BookshelfReaderEndpointRouteBuilderExtensions
             .ProducesProblem(StatusCodes.Status503ServiceUnavailable)
             .ProducesValidationProblem();
 
-        var apiKeyOptions = app.ServiceProvider.GetRequiredService<IOptions<ApiKeyAuthenticationOptions>>().Value;
+        ApiKeyAuthenticationOptions apiKeyOptions = app.ServiceProvider.GetRequiredService<IOptions<ApiKeyAuthenticationOptions>>().Value;
 
-        var parseEndpoint = apiGroup.MapPost("/bookshelf/parse", ParseAsync)
+        RouteHandlerBuilder parseEndpoint = apiGroup.MapPost("/bookshelf/parse", ParseAsync)
             .Accepts<IFormFile>("multipart/form-data")
             .WithName("ParseBookshelf")
             .WithTags(BookshelfTag)
@@ -62,7 +60,7 @@ public static class BookshelfReaderEndpointRouteBuilderExtensions
             return CreateValidationProblem("name", "Query 'name' is required.");
         }
 
-        var result = await lookupService.LookupAsync(name, cancellationToken).ConfigureAwait(false);
+        BookLookupResult result = await lookupService.LookupAsync(name, cancellationToken).ConfigureAwait(false);
 
         if (!result.IsSuccess)
         {
@@ -81,7 +79,7 @@ public static class BookshelfReaderEndpointRouteBuilderExtensions
         IImageUploadRequestHandler uploadRequestHandler,
         CancellationToken cancellationToken)
     {
-        var preparationResult = await uploadRequestHandler.PrepareAsync(request, cancellationToken)
+        UploadProcessingResult preparationResult = await uploadRequestHandler.PrepareAsync(request, cancellationToken)
             .ConfigureAwait(false);
 
         if (!preparationResult.IsSuccess)
@@ -89,11 +87,11 @@ public static class BookshelfReaderEndpointRouteBuilderExtensions
             return preparationResult.Problem!;
         }
 
-        await using var imageStream = preparationResult.Upload!.Stream;
+        await using Stream imageStream = preparationResult.Upload!.Stream;
 
         try
         {
-            var result = await processor.ProcessAsync(imageStream, cancellationToken).ConfigureAwait(false);
+            ParseResult result = await processor.ProcessAsync(imageStream, cancellationToken).ConfigureAwait(false);
             return TypedResults.Ok(result);
         }
         catch (InvalidOperationException ex)

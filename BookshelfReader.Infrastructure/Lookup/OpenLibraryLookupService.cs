@@ -26,9 +26,9 @@ public sealed class OpenLibraryLookupService : IBookLookupService
             return BookLookupResult.Success(Array.Empty<BookMetadata>());
         }
 
-        var requestUri = $"search.json?title={Uri.EscapeDataString(query)}";
+        string requestUri = $"search.json?title={Uri.EscapeDataString(query)}";
 
-        for (var attempt = 0; attempt < MaxRetries; attempt++)
+        for (int attempt = 0; attempt < MaxRetries; attempt++)
         {
             if (attempt > 0)
             {
@@ -39,14 +39,14 @@ public sealed class OpenLibraryLookupService : IBookLookupService
 
             try
             {
-                var response = await _httpClient.GetFromJsonAsync<OpenLibrarySearchResult>(requestUri, cancellationToken).ConfigureAwait(false);
+                OpenLibrarySearchResult? response = await _httpClient.GetFromJsonAsync<OpenLibrarySearchResult>(requestUri, cancellationToken).ConfigureAwait(false);
 
                 if (response?.Docs is null || response.Docs.Count == 0)
                 {
                     return BookLookupResult.Success(Array.Empty<BookMetadata>());
                 }
 
-                var books = response.Docs
+                BookMetadata[] books = response.Docs
                     .OrderByDescending(d => d.FirstPublishYear ?? 0)
                     .Take(5)
                     .Select(d => new BookMetadata

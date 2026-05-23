@@ -8,6 +8,7 @@ BookshelfReader provides dependency injection helpers for wiring the bookshelf p
 2. In `Program.cs` add:
    ```csharp
    using BookshelfReader.Api.Extensions;
+   using BookshelfReader.DependencyInjection;
    using BookshelfReader.DependencyInjection.Authentication;
 
    builder.Services.AddBookshelfReader(builder.Configuration);

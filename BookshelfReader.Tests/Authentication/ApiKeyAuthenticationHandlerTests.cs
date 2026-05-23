@@ -1,6 +1,4 @@
-using System;
 using System.Text.Encodings.Web;
-using System.Threading.Tasks;
 using BookshelfReader.DependencyInjection.Authentication;
 using FluentAssertions;
 using Microsoft.AspNetCore.Authentication;
@@ -16,11 +14,11 @@ public class ApiKeyAuthenticationHandlerTests
     [Fact]
     public async Task AuthenticateAsync_Fails_WhenHeaderMissing()
     {
-        var options = CreateOptions();
+        ApiKeyAuthenticationOptions options = CreateOptions();
         var context = new DefaultHttpContext();
-        var handler = CreateHandler(options, context);
+        ApiKeyAuthenticationHandler handler = CreateHandler(options, context);
 
-        var result = await handler.AuthenticateAsync();
+        AuthenticateResult result = await handler.AuthenticateAsync();
 
         result.Succeeded.Should().BeFalse();
         result.Failure.Should().NotBeNull();
@@ -29,12 +27,12 @@ public class ApiKeyAuthenticationHandlerTests
     [Fact]
     public async Task AuthenticateAsync_Fails_WhenHeaderEmpty()
     {
-        var options = CreateOptions();
+        ApiKeyAuthenticationOptions options = CreateOptions();
         var context = new DefaultHttpContext();
         context.Request.Headers[options.HeaderName] = string.Empty;
-        var handler = CreateHandler(options, context);
+        ApiKeyAuthenticationHandler handler = CreateHandler(options, context);
 
-        var result = await handler.AuthenticateAsync();
+        AuthenticateResult result = await handler.AuthenticateAsync();
 
         result.Succeeded.Should().BeFalse();
         result.Failure.Should().NotBeNull();
@@ -44,12 +42,12 @@ public class ApiKeyAuthenticationHandlerTests
     public async Task AuthenticateAsync_Succeeds_WithValidKey()
     {
         const string expectedKey = "valid-secret";
-        var options = CreateOptions(validKey: expectedKey);
+        ApiKeyAuthenticationOptions options = CreateOptions(validKey: expectedKey);
         var context = new DefaultHttpContext();
         context.Request.Headers[options.HeaderName] = expectedKey;
-        var handler = CreateHandler(options, context);
+        ApiKeyAuthenticationHandler handler = CreateHandler(options, context);
 
-        var result = await handler.AuthenticateAsync();
+        AuthenticateResult result = await handler.AuthenticateAsync();
 
         result.Succeeded.Should().BeTrue();
         result.Principal.Should().NotBeNull();
@@ -60,7 +58,7 @@ public class ApiKeyAuthenticationHandlerTests
     private static ApiKeyAuthenticationHandler CreateHandler(ApiKeyAuthenticationOptions options, HttpContext context)
     {
         var optionsMonitor = new StaticOptionsMonitor<ApiKeyAuthenticationOptions>(options);
-        var handler = new ApiKeyAuthenticationHandler(optionsMonitor, NullLoggerFactory.Instance, UrlEncoder.Default, new SystemClock());
+        var handler = new ApiKeyAuthenticationHandler(optionsMonitor, NullLoggerFactory.Instance, UrlEncoder.Default);
         var scheme = new AuthenticationScheme(ApiKeyAuthenticationDefaults.AuthenticationScheme,
             ApiKeyAuthenticationDefaults.AuthenticationScheme, typeof(ApiKeyAuthenticationHandler));
 

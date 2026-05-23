@@ -1,12 +1,11 @@
-using System.Linq;
-using System.Net;
-using System.Net.Http;
 using System.Text.Json;
+using BookshelfReader.Core.Models;
 using BookshelfReader.Core.Models.External;
 using BookshelfReader.Infrastructure.Lookup;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using RichardSzalay.MockHttp;
+using Xunit;
 
 namespace BookshelfReader.Tests.Lookup;
 
@@ -32,14 +31,16 @@ public class OpenLibraryLookupServiceTests
         httpClient.BaseAddress = new Uri("https://openlibrary.org/");
         var service = new OpenLibraryLookupService(httpClient, NullLogger<OpenLibraryLookupService>.Instance);
 
-        var results = await service.LookupAsync("Test");
+        BookLookupResult result = await service.LookupAsync("Test");
+        var books = result.Books.ToList();
 
-        results.Should().HaveCount(2);
-        results.First().Title.Should().Be("Book A");
-        results.First().Author.Should().Be("Author A");
-        results.First().PublishYear.Should().Be(2020);
-        results.First().Isbn.Should().Be("123");
-        results.First().CoverUrl.Should().Be("https://covers.openlibrary.org/b/id/42-M.jpg");
+        result.ErrorMessage.Should().BeNull();
+        books.Should().HaveCount(2);
+        books[0].Title.Should().Be("Book A");
+        books[0].Author.Should().Be("Author A");
+        books[0].PublishYear.Should().Be(2020);
+        books[0].Isbn.Should().Be("123");
+        books[0].CoverUrl.Should().Be("https://covers.openlibrary.org/b/id/42-M.jpg");
     }
 
     [Fact]
@@ -54,8 +55,8 @@ public class OpenLibraryLookupServiceTests
 
         var service = new OpenLibraryLookupService(httpClient, NullLogger<OpenLibraryLookupService>.Instance);
 
-        var results = await service.LookupAsync("Test");
-        results.Should().BeEmpty();
+        BookLookupResult result = await service.LookupAsync("Test");
+        result.Books.ToList().Should().BeEmpty();
     }
 
     [Fact]
@@ -67,7 +68,7 @@ public class OpenLibraryLookupServiceTests
 
         var service = new OpenLibraryLookupService(httpClient, NullLogger<OpenLibraryLookupService>.Instance);
 
-        var results = await service.LookupAsync(string.Empty);
-        results.Should().BeEmpty();
+        BookLookupResult result = await service.LookupAsync(string.Empty);
+        result.Books.ToList().Should().BeEmpty();
     }
 }

@@ -1,4 +1,3 @@
-using System;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -13,13 +12,13 @@ internal static class ApiKeyValidator
             return false;
         }
 
-        var expectedBytes = Encoding.UTF8.GetBytes(expectedKey);
-        var providedBytes = Encoding.UTF8.GetBytes(providedKey);
+        byte[] expectedBytes = Encoding.UTF8.GetBytes(expectedKey);
+        byte[] providedBytes = Encoding.UTF8.GetBytes(providedKey);
 
         try
         {
-            var expectedHash = SHA256.HashData(expectedBytes);
-            var providedHash = SHA256.HashData(providedBytes);
+            byte[] expectedHash = SHA256.HashData(expectedBytes);
+            byte[] providedHash = SHA256.HashData(providedBytes);
 
             try
             {
@@ -40,10 +39,10 @@ internal static class ApiKeyValidator
 
     public static string CreateKeyIdentifier(string key)
     {
-        var keyBytes = Encoding.UTF8.GetBytes(key);
+        byte[] keyBytes = Encoding.UTF8.GetBytes(key);
         try
         {
-            var hash = SHA256.HashData(keyBytes);
+            byte[] hash = SHA256.HashData(keyBytes);
             try
             {
                 return Convert.ToHexString(hash);

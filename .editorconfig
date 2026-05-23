@@ -1,0 +1,328 @@
+root = true
+
+# =========================================================================
+# All files
+# =========================================================================
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+# =========================================================================
+# Generated code: don't format and don't analyze
+# =========================================================================
+
+[{**/obj/**,**/bin/**,.godot/**}]
+generated_code = true
+
+[**/*.g.cs]
+generated_code = true
+
+[**/*.generated.cs]
+generated_code = true
+
+[**/*.designer.cs]
+generated_code = true
+
+# =========================================================================
+# C# files
+# =========================================================================
+
+[*.cs]
+indent_size = 4
+
+# -------------------------
+# Core formatting & hygiene -- bumped to error so dotnet format will fix and
+# CI will catch drift.
+# -------------------------
+
+dotnet_diagnostic.IDE0055.severity = error   # Formatting (whitespace, braces placement, etc.)
+dotnet_diagnostic.IDE0005.severity = error   # Remove unnecessary usings
+dotnet_diagnostic.IDE0011.severity = error   # Add braces to single-statement control flow
+
+# -------------------------
+# Using directives
+# -------------------------
+
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
+
+# -------------------------
+# Qualification: avoid noisy "this." unless required.
+# -------------------------
+
+dotnet_style_qualification_for_field = false:warning
+dotnet_style_qualification_for_property = false:warning
+dotnet_style_qualification_for_method = false:warning
+dotnet_style_qualification_for_event = false:warning
+
+# -------------------------
+# Type preferences: bias toward explicit types for readability.
+# -------------------------
+
+csharp_style_var_for_built_in_types = false:warning
+csharp_style_var_when_type_is_apparent = true:warning
+csharp_style_var_elsewhere = false:warning
+
+dotnet_style_predefined_type_for_locals_parameters_members = true:warning
+dotnet_style_predefined_type_for_member_access = true:warning
+
+# -------------------------
+# Modern .NET idioms
+# -------------------------
+
+dotnet_style_object_initializer = true:suggestion
+dotnet_style_collection_initializer = true:suggestion
+dotnet_style_coalesce_expression = true:warning
+dotnet_style_null_propagation = true:warning
+dotnet_style_prefer_auto_properties = true:suggestion
+dotnet_style_prefer_is_null_check_over_reference_equality_method = true:warning
+dotnet_style_prefer_compound_assignment = true:warning
+dotnet_style_prefer_simplified_boolean_expressions = true:warning
+dotnet_style_prefer_simplified_interpolation = true:warning
+dotnet_style_readonly_field = true:warning
+dotnet_style_namespace_match_folder = true:warning
+
+# Keep control flow explicit -- avoid clever conditional rewrites.
+dotnet_style_prefer_conditional_expression_over_assignment = false:suggestion
+dotnet_style_prefer_conditional_expression_over_return = false:suggestion
+
+# -------------------------
+# Pattern matching
+# -------------------------
+
+csharp_style_prefer_pattern_matching = true:warning
+csharp_style_pattern_matching_over_is_with_cast_check = true:warning
+csharp_style_pattern_matching_over_as_with_null_check = true:warning
+csharp_style_prefer_not_pattern = true:warning
+csharp_style_prefer_null_check_over_type_check = true:warning
+csharp_style_prefer_switch_expression = false:suggestion
+
+# -------------------------
+# Braces, namespaces, usings
+# -------------------------
+
+csharp_prefer_braces = true:error
+csharp_style_namespace_declarations = file_scoped:warning
+csharp_using_directive_placement = outside_namespace:warning
+csharp_prefer_simple_using_statement = false:suggestion
+
+# Prefer new() when the target type is apparent.
+csharp_style_implicit_object_creation_when_type_is_apparent = true:suggestion
+
+# -------------------------
+# Expression-bodied members
+# Keep methods/ctors block-based; allow compact properties/accessors.
+# -------------------------
+
+csharp_style_expression_bodied_methods = false:suggestion
+csharp_style_expression_bodied_constructors = false:suggestion
+csharp_style_expression_bodied_operators = false:suggestion
+csharp_style_expression_bodied_properties = when_on_single_line:suggestion
+csharp_style_expression_bodied_indexers = when_on_single_line:suggestion
+csharp_style_expression_bodied_accessors = when_on_single_line:suggestion
+csharp_style_expression_bodied_lambdas = true:suggestion
+csharp_style_expression_bodied_local_functions = false:suggestion
+
+# -------------------------
+# Modern C# 7+ niceties
+# -------------------------
+
+csharp_style_inlined_variable_declaration = true:warning
+csharp_style_throw_expression = true:suggestion
+csharp_style_conditional_delegate_call = true:warning
+csharp_style_prefer_index_operator = true:suggestion
+csharp_style_prefer_range_operator = true:suggestion
+csharp_style_prefer_tuple_swap = true:suggestion
+csharp_style_prefer_method_group_conversion = true:suggestion
+csharp_style_deconstructed_variable_declaration = true:suggestion
+
+# Unused values -- use `_` discard
+csharp_style_unused_value_assignment_preference = discard_variable:warning
+csharp_style_unused_value_expression_statement_preference = discard_variable:silent
+
+# -------------------------
+# Selected IDE analyzers
+# Conservative on destructive auto-fixes (unused members are tricky for Godot
+# signal handlers and lifecycle hooks).
+# -------------------------
+
+dotnet_diagnostic.IDE0044.severity = warning      # Add readonly modifier
+dotnet_diagnostic.IDE0059.severity = warning      # Unnecessary value assignment
+dotnet_diagnostic.IDE0090.severity = suggestion   # Use 'new()' simplified
+dotnet_diagnostic.IDE0150.severity = suggestion   # Prefer 'null' check over type check
+dotnet_diagnostic.IDE0270.severity = suggestion   # Use coalesce expression
+# Risky / Godot-sensitive -- keep visible but not enforced.
+dotnet_diagnostic.IDE0051.severity = suggestion   # Unused private member
+dotnet_diagnostic.IDE0052.severity = suggestion   # Unread private member
+dotnet_diagnostic.IDE0060.severity = suggestion   # Unused parameter (Godot signals/lifecycle)
+
+# -------------------------
+# Code Analysis (CA) and xUnit analyzers worth enforcing.
+# These catch real perf and correctness issues, not stylistic preference.
+# -------------------------
+
+dotnet_diagnostic.CA1510.severity = warning   # Use ArgumentNullException.ThrowIfNull
+dotnet_diagnostic.CA1822.severity = warning   # Mark members as static when possible
+dotnet_diagnostic.CA1859.severity = warning   # Use more derived return type for performance
+dotnet_diagnostic.CA1861.severity = warning   # Prefer static readonly over constant array arguments
+
+dotnet_diagnostic.xUnit1042.severity = warning   # Use TheoryData<> over object[]
+dotnet_diagnostic.xUnit2032.severity = warning   # Assert.IsAssignableFrom is confusing; use IsType with exactMatch
+
+# -------------------------
+# New lines
+# -------------------------
+
+csharp_new_line_before_open_brace = all
+csharp_new_line_before_else = true
+csharp_new_line_before_catch = true
+csharp_new_line_before_finally = true
+csharp_new_line_before_members_in_object_initializers = true
+csharp_new_line_before_members_in_anonymous_types = true
+csharp_new_line_between_query_expression_clauses = true
+
+# -------------------------
+# Indentation
+# -------------------------
+
+csharp_indent_block_contents = true
+csharp_indent_braces = false
+csharp_indent_case_contents = true
+csharp_indent_case_contents_when_block = false
+csharp_indent_switch_labels = true
+csharp_indent_labels = one_less_than_current
+
+# -------------------------
+# Spacing
+# -------------------------
+
+csharp_space_after_cast = false
+csharp_space_after_keywords_in_control_flow_statements = true
+csharp_space_between_method_declaration_parameter_list_parentheses = false
+csharp_space_between_method_declaration_empty_parameter_list_parentheses = false
+csharp_space_between_method_call_parameter_list_parentheses = false
+csharp_space_between_method_call_empty_parameter_list_parentheses = false
+csharp_space_between_method_call_name_and_opening_parenthesis = false
+csharp_space_between_parentheses = false
+csharp_space_before_colon_in_inheritance_clause = true
+csharp_space_after_colon_in_inheritance_clause = true
+csharp_space_around_binary_operators = before_and_after
+csharp_space_after_comma = true
+csharp_space_before_comma = false
+csharp_space_after_dot = false
+csharp_space_before_dot = false
+csharp_space_after_semicolon_in_for_statement = true
+csharp_space_before_semicolon_in_for_statement = false
+csharp_space_around_declaration_statements = false
+
+# -------------------------
+# Wrapping
+# -------------------------
+
+# Keep `true` so trivial single-line bodies (e.g. `protected Foo() { }`) aren't
+# blown apart into 3 lines. Set to `false` if you'd rather expand everything.
+csharp_preserve_single_line_blocks = true
+csharp_preserve_single_line_statements = false
+
+# =========================================================================
+# Naming rules
+# =========================================================================
+
+# Interfaces start with I -- enforced.
+dotnet_naming_rule.interfaces_should_start_with_i.severity = error
+dotnet_naming_rule.interfaces_should_start_with_i.symbols = interfaces
+dotnet_naming_rule.interfaces_should_start_with_i.style = interface_style
+
+dotnet_naming_symbols.interfaces.applicable_kinds = interface
+
+dotnet_naming_style.interface_style.required_prefix = I
+dotnet_naming_style.interface_style.capitalization = pascal_case
+
+# Types are PascalCase -- enforced.
+dotnet_naming_rule.types_should_be_pascal_case.severity = error
+dotnet_naming_rule.types_should_be_pascal_case.symbols = types
+dotnet_naming_rule.types_should_be_pascal_case.style = pascal_case_style
+
+dotnet_naming_symbols.types.applicable_kinds = class, struct, interface, enum, delegate
+
+# Public/protected/internal members are PascalCase.
+# Kept at warning (not error) because Godot lifecycle overrides like _Ready,
+# _Process, _ExitTree, _Input start with an underscore and would otherwise
+# break the build on every Node subclass.
+dotnet_naming_rule.non_private_members_should_be_pascal_case.severity = warning
+dotnet_naming_rule.non_private_members_should_be_pascal_case.symbols = non_private_members
+dotnet_naming_rule.non_private_members_should_be_pascal_case.style = pascal_case_style
+
+dotnet_naming_symbols.non_private_members.applicable_kinds = property, method, field, event
+dotnet_naming_symbols.non_private_members.applicable_accessibilities = public, protected, internal, protected_internal, private_protected
+
+# Private instance fields are _camelCase.
+dotnet_naming_rule.private_fields_should_be_camel_case_with_underscore.severity = warning
+dotnet_naming_rule.private_fields_should_be_camel_case_with_underscore.symbols = private_fields
+dotnet_naming_rule.private_fields_should_be_camel_case_with_underscore.style = private_field_style
+
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+
+dotnet_naming_style.private_field_style.required_prefix = _
+dotnet_naming_style.private_field_style.capitalization = camel_case
+
+# Private static readonly fields are PascalCase (standard .NET convention --
+# more-specific rule wins over the instance _camelCase rule above).
+dotnet_naming_rule.private_static_readonly_fields_should_be_pascal_case.severity = warning
+dotnet_naming_rule.private_static_readonly_fields_should_be_pascal_case.symbols = private_static_readonly_fields
+dotnet_naming_rule.private_static_readonly_fields_should_be_pascal_case.style = pascal_case_style
+
+dotnet_naming_symbols.private_static_readonly_fields.applicable_kinds = field
+dotnet_naming_symbols.private_static_readonly_fields.applicable_accessibilities = private
+dotnet_naming_symbols.private_static_readonly_fields.required_modifiers = static, readonly
+
+# Constants are PascalCase -- enforced.
+dotnet_naming_rule.constants_should_be_pascal_case.severity = error
+dotnet_naming_rule.constants_should_be_pascal_case.symbols = constants
+dotnet_naming_rule.constants_should_be_pascal_case.style = pascal_case_style
+
+dotnet_naming_symbols.constants.applicable_kinds = field
+dotnet_naming_symbols.constants.required_modifiers = const
+
+# Async methods end with Async -- kept at suggestion. Godot has lifecycle/signal
+# patterns where Async suffix would be awkward.
+dotnet_naming_rule.async_methods_should_end_with_async.severity = suggestion
+dotnet_naming_rule.async_methods_should_end_with_async.symbols = async_methods
+dotnet_naming_rule.async_methods_should_end_with_async.style = async_suffix_style
+
+dotnet_naming_symbols.async_methods.applicable_kinds = method
+dotnet_naming_symbols.async_methods.required_modifiers = async
+
+dotnet_naming_style.async_suffix_style.required_suffix = Async
+dotnet_naming_style.async_suffix_style.capitalization = pascal_case
+
+# Shared naming styles.
+dotnet_naming_style.pascal_case_style.capitalization = pascal_case
+dotnet_naming_style.camel_case_style.capitalization = camel_case
+
+# =========================================================================
+# XML / MSBuild project files
+# =========================================================================
+
+[*.{csproj,props,targets,xml}]
+indent_size = 2
+
+# =========================================================================
+# Web / config files
+# =========================================================================
+
+[*.{json,js,jsx,ts,tsx,css,scss,html,yml,yaml}]
+indent_size = 2
+
+# =========================================================================
+# Markdown -- preserve trailing whitespace (two-space hard line breaks)
+# =========================================================================
+
+[*.md]
+trim_trailing_whitespace = false

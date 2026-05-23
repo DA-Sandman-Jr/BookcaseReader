@@ -1,8 +1,9 @@
 using System.Security.Claims;
-using System.Threading.Tasks;
+using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Primitives;
 
 namespace BookshelfReader.DependencyInjection.Authentication;
 
@@ -11,9 +12,8 @@ internal sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKey
     public ApiKeyAuthenticationHandler(
         IOptionsMonitor<ApiKeyAuthenticationOptions> options,
         ILoggerFactory logger,
-        System.Text.Encodings.Web.UrlEncoder encoder,
-        ISystemClock clock)
-        : base(options, logger, encoder, clock)
+        UrlEncoder encoder)
+        : base(options, logger, encoder)
     {
     }
 
@@ -30,25 +30,25 @@ internal sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKey
             return Task.FromResult(AuthenticateResult.Fail("Invalid API key."));
         }
 
-        if (!Request.Headers.TryGetValue(Options.HeaderName, out var headerValues))
+        if (!Request.Headers.TryGetValue(Options.HeaderName, out StringValues headerValues))
         {
             Logger.LogWarning("Request from {RemoteIp} is missing the required API key header {HeaderName}.",
                 Context.Connection.RemoteIpAddress, Options.HeaderName);
             return Task.FromResult(AuthenticateResult.Fail("Invalid API key."));
         }
 
-        var providedKey = headerValues.ToString();
+        string providedKey = headerValues.ToString();
         if (string.IsNullOrWhiteSpace(providedKey))
         {
             Logger.LogWarning("Request from {RemoteIp} provided an empty API key header.", Context.Connection.RemoteIpAddress);
             return Task.FromResult(AuthenticateResult.Fail("Invalid API key."));
         }
 
-        foreach (var validKey in Options.ValidKeys)
+        foreach (string validKey in Options.ValidKeys)
         {
             if (ApiKeyValidator.IsMatch(validKey, providedKey))
             {
-                var claims = new[]
+                Claim[] claims = new[]
                 {
                     new Claim(ApiKeyAuthenticationDefaults.ApiKeyClaimType, ApiKeyValidator.CreateKeyIdentifier(validKey))
                 };

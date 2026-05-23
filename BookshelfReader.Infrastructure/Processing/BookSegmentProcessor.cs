@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-using System.Linq;
 using BookshelfReader.Core.Abstractions;
 using BookshelfReader.Core.Models;
 using Microsoft.Extensions.Logging;
@@ -43,8 +41,8 @@ public sealed class BookSegmentProcessor : IBookSegmentProcessor
     {
         try
         {
-            var ocrResult = await _ocrService.RecognizeAsync(segment.ImageData, cancellationToken).ConfigureAwait(false);
-            var candidate = _parsingService.Parse(segment, ocrResult);
+            OcrResult ocrResult = await _ocrService.RecognizeAsync(segment.ImageData, cancellationToken).ConfigureAwait(false);
+            BookCandidate candidate = _parsingService.Parse(segment, ocrResult);
             candidate.Genres = _genreClassifier.Classify(candidate.Title, candidate.RawText).ToList();
             AddRotationNotes(candidate, ocrResult.Attempts);
 
@@ -68,7 +66,7 @@ public sealed class BookSegmentProcessor : IBookSegmentProcessor
             return;
         }
 
-        var labels = attempts
+        string[] labels = attempts
             .Select((_, attemptIndex) => attemptIndex switch
             {
                 0 => "0°",

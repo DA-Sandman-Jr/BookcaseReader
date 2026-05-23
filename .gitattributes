@@ -1,0 +1,98 @@
+# Auto-detect text files and normalize line endings to LF in the repo.
+# Override locally via .editorconfig + gitattributes per-file-type below.
+* text=auto eol=lf
+
+# -------------------------
+# Source code -- LF
+# -------------------------
+
+*.cs        text eol=lf diff=csharp
+*.csproj    text eol=lf
+*.sln       text eol=lf
+*.props     text eol=lf
+*.targets   text eol=lf
+*.config    text eol=lf
+*.json      text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.xml       text eol=lf
+*.md        text eol=lf
+
+# Godot text resources -- LF (Godot's own convention).
+*.tscn      text eol=lf
+*.tres      text eol=lf
+*.gd        text eol=lf
+*.gdshader  text eol=lf
+*.import    text eol=lf
+*.godot     text eol=lf
+*.cfg       text eol=lf
+
+# -------------------------
+# Shell scripts -- LF (must be LF for Unix execution).
+# -------------------------
+
+*.sh        text eol=lf
+*.bash      text eol=lf
+
+# -------------------------
+# Windows scripts -- CRLF (cmd.exe requires CRLF).
+# -------------------------
+
+*.bat       text eol=crlf
+*.cmd       text eol=crlf
+*.ps1       text eol=lf
+*.psm1      text eol=lf
+
+# -------------------------
+# Binary files -- never diff, never normalize.
+# -------------------------
+
+# Images
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.bmp       binary
+*.ico       binary
+*.icns      binary
+*.webp      binary
+*.svg       text eol=lf
+
+# Fonts
+*.ttf       binary
+*.otf       binary
+*.woff      binary
+*.woff2     binary
+*.eot       binary
+
+# Audio / video
+*.mp3       binary
+*.wav       binary
+*.ogg       binary
+*.opus      binary
+*.flac      binary
+*.mp4       binary
+*.webm      binary
+
+# Archives
+*.zip       binary
+*.gz        binary
+*.tar       binary
+*.7z        binary
+*.rar       binary
+
+# Binaries / compiled
+*.exe       binary
+*.dll       binary
+*.so        binary
+*.dylib     binary
+*.pdb       binary
+*.lib       binary
+*.a         binary
+
+# Documents
+*.pdf       binary
+
+# Godot binary assets
+*.tex       binary
+*.atlas     binary
