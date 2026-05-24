@@ -20,7 +20,9 @@
             var destDir = System.IO.Path.GetDirectoryName(source);
             if (string.IsNullOrEmpty(destDir)) continue;
             var dest = System.IO.Path.Combine(destDir, "AGENTS.md");
-            var sourceText = System.IO.File.ReadAllText(source);
+            var sourceText = System.IO.File.ReadAllText(source)
+                .Replace("\r\n", "\n")
+                .Replace("\r", "\n");
             var agentsText = System.Text.RegularExpressions.Regex.Replace(
                 sourceText,
                 @"`AGENTS\.md` files are auto-generated from sibling `CLAUDE\.md` on build via `Directory\.Build\.targets`\. Edit the `CLAUDE\.md`, not the `AGENTS\.md`\.",
@@ -31,7 +33,7 @@
                 "CLAUDE\\.md",
                 "AGENTS.md",
                 System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            var newContent = header + System.Environment.NewLine + System.Environment.NewLine + agentsText;
+            var newContent = header + "\n\n" + agentsText;
             var existing = System.IO.File.Exists(dest) ? System.IO.File.ReadAllText(dest) : null;
             if (existing != newContent)
             {
