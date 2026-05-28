@@ -1,5 +1,4 @@
 {
-  "_comment": "Merge the contents of `hooks.PreToolUse` below into .claude/settings.json. Do NOT replace the whole file — preserve any existing hooks/permissions/etc. If hooks.PreToolUse already exists, append this matcher entry to its array.",
   "hooks": {
     "PreToolUse": [
       {
@@ -8,8 +7,7 @@
           {
             "type": "command",
             "if": "Bash(git commit:*)",
-            "shell": "bash",
-            "command": "if [ -f \"$CLAUDE_PROJECT_DIR/scripts/activate-dotnet.sh\" ]; then source \"$CLAUDE_PROJECT_DIR/scripts/activate-dotnet.sh\"; fi && SLN=$(ls \"$CLAUDE_PROJECT_DIR\"/*.sln 2>/dev/null | head -1) && if [ -z \"$SLN\" ]; then echo \"[pre-commit] No .sln at repo root — skipping format.\"; else (cd \"$CLAUDE_PROJECT_DIR\" && dotnet format \"$SLN\") && (git -C \"$CLAUDE_PROJECT_DIR\" diff --cached --name-only -z -- '*.cs' | xargs -0 -r git -C \"$CLAUDE_PROJECT_DIR\" add); fi",
+            "command": "$CLAUDE_PROJECT_DIR/scripts/claude-format-staged.sh",
             "timeout": 180,
             "statusMessage": "Formatting before commit"
           }
