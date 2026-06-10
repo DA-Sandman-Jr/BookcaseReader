@@ -23,14 +23,19 @@ BookshelfReader provides dependency injection helpers for wiring the bookshelf p
        .AddBookshelfReaderApiKey();
 
    builder.Services.AddAuthorization();
+   builder.Services.AddBookshelfReaderRateLimiting(builder.Configuration);
 
+   app.UseRateLimiter();
    app.MapBookshelfReaderApi();
    ```
 3. Provide configuration values (environment variables or `appsettings.json`):
    * `Authentication:ApiKey`: `HeaderName` (default `X-API-Key`), `RequireApiKey`, and `ValidKeys`.
+   * `RateLimiting:Parse`: `Enabled` (default `false`), `PermitLimit` (default `10`), and `WindowSeconds` (default `60`). Enabling this policy also requires `builder.Services.AddBookshelfReaderRateLimiting(builder.Configuration);` during service registration and `app.UseRateLimiter();` before mapping the API endpoints.
    * `Uploads`: `MaxBytes` (1–20 MB) and `AllowedContentTypes` (JPEG/PNG).
    * `Enrichment`: `Enabled` (default `true`), `MaxConcurrentLookups` (1–16, default 4), and `MinMatchScore` (0–100, default 55). When enabled, `/api/bookshelf/parse` looks up each parsed title against Open Library and attaches the best match (title, author, year, ISBN, cover URL, subjects) to the candidate's `metadata` field, so callers get display-ready results from a single request.
    * Optional: `OpenLibrary:BaseUrl` (must be HTTPS), `OpenLibrary:UserAgent` (sent to Open Library; defaults to a BookshelfReader identifier), `Ocr:Tesseract`, `Segmentation`, and `Parsing` settings.
+
+Embedders must provide OCR language data by placing `eng.traineddata` (or the languages they configure) in a tessdata directory and pointing `Ocr:Tesseract:DataPath` at it. `BookshelfReader.Host` downloads `eng.traineddata` from the [tessdata_fast repository](https://github.com/tesseract-ocr/tessdata_fast) automatically on first build, but package consumers need to provision that folder themselves.
 
 ## Packing for nuget.org (testing)
 
