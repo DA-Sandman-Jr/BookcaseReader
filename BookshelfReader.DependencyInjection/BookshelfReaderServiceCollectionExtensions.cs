@@ -1,6 +1,7 @@
 using BookshelfReader.Core.Abstractions;
 using BookshelfReader.Core.Options;
 using BookshelfReader.DependencyInjection.Authentication;
+using BookshelfReader.Infrastructure.Enrichment;
 using BookshelfReader.Infrastructure.Genres;
 using BookshelfReader.Infrastructure.Lookup;
 using BookshelfReader.Infrastructure.Ocr;
@@ -54,11 +55,20 @@ public static class BookshelfReaderServiceCollectionExtensions
             .ValidateOnStart();
         services.Configure<ParsingOptions>(configuration.GetSection(ParsingOptions.SectionName));
 
+        services.AddOptions<EnrichmentOptions>()
+            .Bind(configuration.GetSection(EnrichmentOptions.SectionName))
+            .Validate(options => options.MaxConcurrentLookups is >= 1 and <= 16,
+                "Enrichment:MaxConcurrentLookups must be between 1 and 16.")
+            .Validate(options => options.MinMatchScore is >= 0 and <= 100,
+                "Enrichment:MinMatchScore must be between 0 and 100.")
+            .ValidateOnStart();
+
         services.AddSingleton<IBookSegmentationService, OpenCvBookSegmentationService>();
         services.AddSingleton<IOcrService, TesseractOcrService>();
         services.AddSingleton<IBookParsingService, BookParsingService>();
         services.AddSingleton<IGenreClassifier, KeywordGenreClassifier>();
         services.AddSingleton<IBookSegmentProcessor, BookSegmentProcessor>();
+        services.AddSingleton<IBookEnrichmentService, BookEnrichmentService>();
         services.AddSingleton<IBookshelfProcessingService, BookshelfProcessingService>();
 
         services.AddHttpClient<IBookLookupService, OpenLibraryLookupService>((_, client) =>
@@ -77,6 +87,12 @@ public static class BookshelfReaderServiceCollectionExtensions
 
             client.BaseAddress = baseUri;
             client.Timeout = TimeSpan.FromSeconds(10);
+
+            // Open Library's API guidelines ask clients to identify themselves;
+            // anonymous high-volume traffic risks throttling.
+            string userAgent = configuration["OpenLibrary:UserAgent"]
+                ?? "BookshelfReader/1.0 (+https://github.com/DA-Sandman-Jr/BookcaseReader)";
+            client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", userAgent);
         });
 
         return services;

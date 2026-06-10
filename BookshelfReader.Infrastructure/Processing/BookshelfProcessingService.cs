@@ -9,15 +9,18 @@ public sealed class BookshelfProcessingService : IBookshelfProcessingService
 {
     private readonly IBookSegmentationService _segmentationService;
     private readonly IBookSegmentProcessor _segmentProcessor;
+    private readonly IBookEnrichmentService _enrichmentService;
     private readonly ILogger<BookshelfProcessingService> _logger;
 
     public BookshelfProcessingService(
         IBookSegmentationService segmentationService,
         IBookSegmentProcessor segmentProcessor,
+        IBookEnrichmentService enrichmentService,
         ILogger<BookshelfProcessingService> logger)
     {
         _segmentationService = segmentationService;
         _segmentProcessor = segmentProcessor;
+        _enrichmentService = enrichmentService;
         _logger = logger;
     }
 
@@ -47,6 +50,13 @@ public sealed class BookshelfProcessingService : IBookshelfProcessingService
             }
 
             diagnostics.AddNotes(AddSegmentContext(index, segmentResult.Notes));
+        }
+
+        if (books.Count > 0)
+        {
+            await _enrichmentService.EnrichAsync(books, cancellationToken).ConfigureAwait(false);
+            int enriched = books.Count(b => b.Metadata is not null);
+            _logger.LogInformation("Enriched {Enriched}/{Total} candidates for image {ImageId}", enriched, books.Count, imageId);
         }
 
         stopwatch.Stop();

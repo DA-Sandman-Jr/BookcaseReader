@@ -25,9 +25,11 @@ public class BookshelfProcessingServiceTests
             SegmentProcessingResult.Failure("boom")
         });
 
+        var enrichmentService = new RecordingEnrichmentService();
         var service = new BookshelfProcessingService(
             segmentationService,
             segmentProcessor,
+            enrichmentService,
             NullLogger<BookshelfProcessingService>.Instance);
 
         using var stream = new MemoryStream();
@@ -37,6 +39,45 @@ public class BookshelfProcessingServiceTests
         result.Books.Single().Title.Should().Be("First");
         result.Diagnostics.SegmentCount.Should().Be(2);
         result.Diagnostics.Notes.Should().ContainSingle(note => note.Contains("Segment 1") && note.Contains("boom"));
+    }
+
+    [Fact]
+    public async Task ProcessAsync_PassesParsedCandidatesToEnrichment()
+    {
+        var segments = new List<BookSegment>
+        {
+            new() { BoundingBox = new Rect(0, 0, 10, 10), ImageData = new byte[] { 1 } }
+        };
+
+        var segmentationService = new StubSegmentationService(segments);
+        var segmentProcessor = new SequenceSegmentProcessor(new[]
+        {
+            new SegmentProcessingResult(new BookCandidate { Title = "First" }, Array.Empty<string>())
+        });
+
+        var enrichmentService = new RecordingEnrichmentService();
+        var service = new BookshelfProcessingService(
+            segmentationService,
+            segmentProcessor,
+            enrichmentService,
+            NullLogger<BookshelfProcessingService>.Instance);
+
+        using var stream = new MemoryStream();
+        await service.ProcessAsync(stream);
+
+        enrichmentService.Received.Should().NotBeNull();
+        enrichmentService.Received.Should().ContainSingle(candidate => candidate.Title == "First");
+    }
+
+    private sealed class RecordingEnrichmentService : IBookEnrichmentService
+    {
+        public IReadOnlyList<BookCandidate>? Received { get; private set; }
+
+        public Task EnrichAsync(IReadOnlyList<BookCandidate> candidates, CancellationToken cancellationToken = default)
+        {
+            Received = candidates;
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class StubSegmentationService : IBookSegmentationService

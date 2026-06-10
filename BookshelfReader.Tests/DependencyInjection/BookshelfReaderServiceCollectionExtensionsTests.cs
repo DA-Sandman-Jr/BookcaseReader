@@ -32,6 +32,26 @@ public class BookshelfReaderServiceCollectionExtensionsTests
         services.Should().Contain(descriptor => descriptor.ServiceType == typeof(IBookParsingService));
         services.Should().Contain(descriptor => descriptor.ServiceType == typeof(IBookshelfProcessingService));
         services.Should().Contain(descriptor => descriptor.ServiceType == typeof(IBookLookupService));
+        services.Should().Contain(descriptor => descriptor.ServiceType == typeof(IBookEnrichmentService));
+    }
+
+    [Fact]
+    public void AddBookshelfReader_InvalidEnrichmentOptions_ThrowsValidationException()
+    {
+        IConfigurationRoot configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Enrichment:MaxConcurrentLookups"] = "0"
+        }).Build();
+
+        var services = new ServiceCollection();
+        services.AddBookshelfReader(configuration);
+
+        ServiceProvider provider = services.BuildServiceProvider();
+
+        Action act = () => provider.GetRequiredService<IOptions<BookshelfReader.Core.Options.EnrichmentOptions>>().Value.ToString();
+
+        act.Should().Throw<OptionsValidationException>()
+            .WithMessage("*Enrichment:MaxConcurrentLookups must be between 1 and 16.*");
     }
 
     [Fact]
