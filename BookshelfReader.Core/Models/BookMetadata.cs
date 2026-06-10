@@ -7,4 +7,5 @@ public sealed class BookMetadata
     public int? PublishYear { get; set; }
     public string? Isbn { get; set; }
     public string? CoverUrl { get; set; }
+    public List<string> Subjects { get; set; } = new();
 }
