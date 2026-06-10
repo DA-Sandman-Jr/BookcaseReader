@@ -83,7 +83,7 @@ public sealed class TesseractOcrService : IOcrService, IDisposable
             {
                 (0, pix.Clone),
                 (90, () => pix.Rotate90(1)),
-                (270, () => pix.Rotate90(3))
+                (270, () => pix.Rotate90(-1))
             };
 
             var attempts = new List<string>();
