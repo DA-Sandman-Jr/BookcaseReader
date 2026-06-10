@@ -1,6 +1,6 @@
 using BookshelfReader.Core.Abstractions;
-using BookshelfReader.DependencyInjection;
-using BookshelfReader.DependencyInjection.Authentication;
+using BookshelfReader.Extensions;
+using BookshelfReader.Extensions.Authentication;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;

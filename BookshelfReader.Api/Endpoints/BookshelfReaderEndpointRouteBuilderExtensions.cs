@@ -3,7 +3,7 @@ using BookshelfReader.Api.Validation;
 using BookshelfReader.Core.Abstractions;
 using BookshelfReader.Core.Models;
 using BookshelfReader.Core.Options;
-using BookshelfReader.DependencyInjection.Authentication;
+using BookshelfReader.Extensions.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;

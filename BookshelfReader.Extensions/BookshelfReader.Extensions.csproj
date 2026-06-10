@@ -5,6 +5,9 @@
     <Nullable>enable</Nullable>
     <IsPackable>true</IsPackable>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageId>BookshelfReader.Extensions</PackageId>
+    <AssemblyName>BookshelfReader.Extensions</AssemblyName>
+    <RootNamespace>BookshelfReader.Extensions</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\BookshelfReader.Core\BookshelfReader.Core.csproj" />

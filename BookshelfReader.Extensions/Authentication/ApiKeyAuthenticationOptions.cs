@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Authentication;
 
-namespace BookshelfReader.DependencyInjection.Authentication;
+namespace BookshelfReader.Extensions.Authentication;
 
 public sealed class ApiKeyAuthenticationOptions : AuthenticationSchemeOptions
 {

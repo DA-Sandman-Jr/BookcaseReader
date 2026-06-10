@@ -32,15 +32,15 @@ jobs:
       - name: Pack API package
         run: dotnet pack BookshelfReader.Api/BookshelfReader.Api.csproj -c Release --no-build
 
-      - name: Pack DependencyInjection package
-        run: dotnet pack BookshelfReader.DependencyInjection/BookshelfReader.DependencyInjection.csproj -c Release --no-build
+      - name: Pack Extensions package
+        run: dotnet pack BookshelfReader.Extensions/BookshelfReader.Extensions.csproj -c Release --no-build
 
       - name: Verify package count
         shell: pwsh
         run: |
           $packages = @(
             "BookshelfReader.Api/bin/Release/BookshelfReader.Api.1.0.0.nupkg",
-            "BookshelfReader.DependencyInjection/bin/Release/BookshelfReader.DependencyInjection.1.0.0.nupkg"
+            "BookshelfReader.Extensions/bin/Release/BookshelfReader.Extensions.1.0.0.nupkg"
           )
           $missing = $packages | Where-Object { -not (Test-Path $_) }
           if ($missing.Count -gt 0) {
@@ -53,5 +53,5 @@ jobs:
           name: nuget-packages
           path: |
             BookshelfReader.Api/bin/Release/BookshelfReader.Api.1.0.0.nupkg
-            BookshelfReader.DependencyInjection/bin/Release/BookshelfReader.DependencyInjection.1.0.0.nupkg
+            BookshelfReader.Extensions/bin/Release/BookshelfReader.Extensions.1.0.0.nupkg
           if-no-files-found: error
