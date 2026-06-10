@@ -17,10 +17,17 @@
       SourceUrl="https://github.com/tesseract-ocr/tessdata_fast/raw/main/eng.traineddata"
       DestinationFolder="$(MSBuildProjectDirectory)\tessdata"
       SkipUnchangedFiles="true" />
+  </Target>
+  <Target Name="CopyTessdataToOutput"
+          AfterTargets="Build"
+          DependsOnTargets="EnsureTessdata"
+          Condition="'$(DesignTimeBuild)' != 'true'">
     <ItemGroup>
-      <None Include="$(MSBuildProjectDirectory)\tessdata\*.traineddata"
-            TargetPath="tessdata\%(Filename)%(Extension)"
-            CopyToOutputDirectory="PreserveNewest" />
+      <TessdataFiles Include="$(MSBuildProjectDirectory)\tessdata\*.traineddata" />
     </ItemGroup>
+    <MakeDir Directories="$(OutDir)tessdata" />
+    <Copy SourceFiles="@(TessdataFiles)"
+          DestinationFiles="@(TessdataFiles->'$(OutDir)tessdata\%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
   </Target>
 </Project>
