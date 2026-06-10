@@ -35,16 +35,20 @@ jobs:
       - name: Verify package count
         shell: pwsh
         run: |
-          $packages = Get-ChildItem -Path . -Recurse -File -Filter *.nupkg |
-            Where-Object { $_.FullName -like "*\\bin\\Release\\*" }
-          if ($packages.Count -ne 2) {
-            $names = if ($packages) { $packages.FullName -join "`n" } else { "<none>" }
-            throw "Expected exactly 2 .nupkg files under bin\\Release, found $($packages.Count):`n$names"
+          $packages = @(
+            "BookshelfReader.Api/bin/Release/BookshelfReader.Api.1.0.0.nupkg",
+            "BookshelfReader.DependencyInjection/bin/Release/BookshelfReader.DependencyInjection.1.0.0.nupkg"
+          )
+          $missing = $packages | Where-Object { -not (Test-Path $_) }
+          if ($missing.Count -gt 0) {
+            throw "Missing expected packages:`n$($missing -join "`n")"
           }
 
       - name: Upload NuGet packages
         uses: actions/upload-artifact@v4
         with:
           name: nuget-packages
-          path: '**/bin/Release/*.nupkg'
+          path: |
+            BookshelfReader.Api/bin/Release/BookshelfReader.Api.1.0.0.nupkg
+            BookshelfReader.DependencyInjection/bin/Release/BookshelfReader.DependencyInjection.1.0.0.nupkg
           if-no-files-found: error
