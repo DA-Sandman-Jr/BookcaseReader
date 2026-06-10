@@ -29,7 +29,8 @@ BookshelfReader provides dependency injection helpers for wiring the bookshelf p
 3. Provide configuration values (environment variables or `appsettings.json`):
    * `Authentication:ApiKey`: `HeaderName` (default `X-API-Key`), `RequireApiKey`, and `ValidKeys`.
    * `Uploads`: `MaxBytes` (1–20 MB) and `AllowedContentTypes` (JPEG/PNG).
-   * Optional: `OpenLibrary:BaseUrl` (must be HTTPS), `Ocr:Tesseract`, `Segmentation`, and `Parsing` settings.
+   * `Enrichment`: `Enabled` (default `true`), `MaxConcurrentLookups` (1–16, default 4), and `MinMatchScore` (0–100, default 55). When enabled, `/api/bookshelf/parse` looks up each parsed title against Open Library and attaches the best match (title, author, year, ISBN, cover URL, subjects) to the candidate's `metadata` field, so callers get display-ready results from a single request.
+   * Optional: `OpenLibrary:BaseUrl` (must be HTTPS), `OpenLibrary:UserAgent` (sent to Open Library; defaults to a BookshelfReader identifier), `Ocr:Tesseract`, `Segmentation`, and `Parsing` settings.
 
 ## Packing for nuget.org (testing)
 
