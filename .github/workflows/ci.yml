@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-test-pack:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        run: dotnet restore BookshelfReader.sln
+
+      - name: Build
+        run: dotnet build BookshelfReader.sln -c Release --no-restore
+
+      - name: Test
+        run: dotnet test BookshelfReader.sln -c Release --no-build --verbosity minimal
+
+      - name: Pack
+        run: dotnet pack BookshelfReader.sln -c Release --no-build
+
+      - name: Verify package count
+        shell: pwsh
+        run: |
+          $packages = Get-ChildItem -Path . -Recurse -File -Filter *.nupkg |
+            Where-Object { $_.FullName -like "*\\bin\\Release\\*" }
+          if ($packages.Count -ne 2) {
+            $names = if ($packages) { $packages.FullName -join "`n" } else { "<none>" }
+            throw "Expected exactly 2 .nupkg files under bin\\Release, found $($packages.Count):`n$names"
+          }
+
+      - name: Upload NuGet packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-packages
+          path: '**/bin/Release/*.nupkg'
+          if-no-files-found: error
