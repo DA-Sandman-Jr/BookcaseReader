@@ -1,6 +1,8 @@
+using BookshelfReader.Api.RateLimiting;
 using BookshelfReader.Api.Validation;
 using BookshelfReader.Core.Abstractions;
 using BookshelfReader.Core.Models;
+using BookshelfReader.Core.Options;
 using BookshelfReader.DependencyInjection.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
@@ -45,6 +47,15 @@ public static class BookshelfReaderEndpointRouteBuilderExtensions
             {
                 AuthenticationSchemes = ApiKeyAuthenticationDefaults.AuthenticationScheme
             });
+        }
+
+        ParseRateLimitOptions rateLimitOptions = app.ServiceProvider
+            .GetRequiredService<IOptions<ParseRateLimitOptions>>().Value;
+        if (rateLimitOptions.Enabled)
+        {
+            parseEndpoint
+                .RequireRateLimiting(BookshelfReaderRateLimitingExtensions.ParsePolicyName)
+                .Produces(StatusCodes.Status429TooManyRequests);
         }
 
         return apiGroup;

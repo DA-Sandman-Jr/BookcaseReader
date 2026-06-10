@@ -32,6 +32,13 @@ public static class BookshelfReaderServiceCollectionExtensions
                 "At least one non-empty API key must be configured when API keys are required.")
             .ValidateOnStart();
 
+        // AuthenticationHandler resolves the scheme-named options instance, which
+        // does not inherit the unnamed binding above; bind it to the same section
+        // or the handler sees defaults (RequireApiKey=false, no keys) and rejects
+        // every request when enforcement is enabled.
+        services.AddOptions<ApiKeyAuthenticationOptions>(ApiKeyAuthenticationDefaults.AuthenticationScheme)
+            .Bind(configuration.GetSection(ApiKeyAuthenticationOptions.SectionName));
+
         services.AddOptions<UploadsOptions>()
             .Bind(configuration.GetSection(UploadsOptions.SectionName))
             .Validate(options => options.MaxBytes is > 0 and <= 20 * 1024 * 1024,

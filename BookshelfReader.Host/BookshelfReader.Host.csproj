@@ -8,4 +8,17 @@
   <ItemGroup>
     <ProjectReference Include="..\BookshelfReader.Api\BookshelfReader.Api.csproj" />
   </ItemGroup>
+  <!-- Fetch English OCR training data on first build so the reference host
+       works out of the box. The file is gitignored; delete the tessdata folder
+       to force a re-download. -->
+  <Target Name="EnsureTessdata" BeforeTargets="AssignTargetPaths" Condition="'$(DesignTimeBuild)' != 'true'">
+    <DownloadFile
+      Condition="!Exists('$(MSBuildProjectDirectory)\tessdata\eng.traineddata')"
+      SourceUrl="https://github.com/tesseract-ocr/tessdata_fast/raw/main/eng.traineddata"
+      DestinationFolder="$(MSBuildProjectDirectory)\tessdata"
+      SkipUnchangedFiles="true" />
+    <ItemGroup>
+      <None Include="$(MSBuildProjectDirectory)\tessdata\*.traineddata" Link="tessdata\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+  </Target>
 </Project>
