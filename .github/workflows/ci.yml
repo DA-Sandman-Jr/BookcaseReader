@@ -29,8 +29,11 @@ jobs:
       - name: Test
         run: dotnet test BookshelfReader.sln -c Release --no-build --verbosity minimal
 
-      - name: Pack
-        run: dotnet pack BookshelfReader.sln -c Release --no-build
+      - name: Pack API package
+        run: dotnet pack BookshelfReader.Api/BookshelfReader.Api.csproj -c Release --no-build
+
+      - name: Pack DependencyInjection package
+        run: dotnet pack BookshelfReader.DependencyInjection/BookshelfReader.DependencyInjection.csproj -c Release --no-build
 
       - name: Verify package count
         shell: pwsh
