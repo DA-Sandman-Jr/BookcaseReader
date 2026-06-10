@@ -9,4 +9,5 @@ public sealed class BookCandidate
     public double Confidence { get; set; }
     public string RawText { get; set; } = string.Empty;
     public List<string> Notes { get; set; } = new();
+    public BookMetadata? Metadata { get; set; }
 }
