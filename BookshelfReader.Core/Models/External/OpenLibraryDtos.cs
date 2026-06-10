@@ -24,4 +24,7 @@ public sealed class OpenLibraryDoc
 
     [JsonPropertyName("cover_i")]
     public int? CoverId { get; set; }
+
+    [JsonPropertyName("subject")]
+    public List<string>? Subject { get; set; }
 }

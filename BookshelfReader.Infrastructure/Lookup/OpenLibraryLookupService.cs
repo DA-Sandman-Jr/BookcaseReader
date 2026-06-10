@@ -18,6 +18,9 @@ public sealed class OpenLibraryLookupService : IBookLookupService
     }
 
     private const int MaxRetries = 3;
+    private const int MaxResults = 5;
+    private const int MaxSubjects = 10;
+    private const string RequestedFields = "title,author_name,first_publish_year,isbn,cover_i,subject";
 
     public async Task<BookLookupResult> LookupAsync(string query, CancellationToken cancellationToken = default)
     {
@@ -26,7 +29,10 @@ public sealed class OpenLibraryLookupService : IBookLookupService
             return BookLookupResult.Success(Array.Empty<BookMetadata>());
         }
 
-        string requestUri = $"search.json?title={Uri.EscapeDataString(query)}";
+        // General-purpose search rather than the title-only field: parsed spine
+        // text frequently concatenates title and author ("Dune Frank Herbert"),
+        // which the title index misses but relevance search handles well.
+        string requestUri = $"search.json?q={Uri.EscapeDataString(query)}&fields={RequestedFields}&limit={MaxResults}";
 
         for (int attempt = 0; attempt < MaxRetries; attempt++)
         {
@@ -46,9 +52,10 @@ public sealed class OpenLibraryLookupService : IBookLookupService
                     return BookLookupResult.Success(Array.Empty<BookMetadata>());
                 }
 
+                // Preserve Open Library's relevance ordering; re-sorting by publish
+                // year buries the canonical edition behind newer derivative works.
                 BookMetadata[] books = response.Docs
-                    .OrderByDescending(d => d.FirstPublishYear ?? 0)
-                    .Take(5)
+                    .Take(MaxResults)
                     .Select(d => new BookMetadata
                     {
                         Title = d.Title ?? string.Empty,
@@ -57,7 +64,8 @@ public sealed class OpenLibraryLookupService : IBookLookupService
                         Isbn = d.Isbn?.FirstOrDefault(),
                         CoverUrl = d.CoverId.HasValue
                             ? $"https://covers.openlibrary.org/b/id/{d.CoverId}-M.jpg"
-                            : null
+                            : null,
+                        Subjects = d.Subject?.Take(MaxSubjects).ToList() ?? new List<string>()
                     })
                     .ToArray();
 

@@ -19,12 +19,15 @@ public class OpenLibraryLookupServiceTests
         {
             Docs = new List<OpenLibraryDoc>
             {
-                new() { Title = "Book A", AuthorName = new() { "Author A" }, FirstPublishYear = 2020, Isbn = new() { "123" }, CoverId = 42 },
+                new() { Title = "Book A", AuthorName = new() { "Author A" }, FirstPublishYear = 2020, Isbn = new() { "123" }, CoverId = 42, Subject = new() { "Fantasy", "Fiction" } },
                 new() { Title = "Book B", AuthorName = new() { "Author B" }, FirstPublishYear = 2018, Isbn = new() { "321" } }
             }
         };
 
-        handler.When(HttpMethod.Get, "https://openlibrary.org/search.json*")
+        handler.When(HttpMethod.Get, "https://openlibrary.org/search.json")
+            .WithQueryString("q", "Test")
+            .WithQueryString("limit", "5")
+            .WithQueryString("fields", "title,author_name,first_publish_year,isbn,cover_i,subject")
             .Respond("application/json", JsonSerializer.Serialize(response));
 
         var httpClient = handler.ToHttpClient();
@@ -41,6 +44,34 @@ public class OpenLibraryLookupServiceTests
         books[0].PublishYear.Should().Be(2020);
         books[0].Isbn.Should().Be("123");
         books[0].CoverUrl.Should().Be("https://covers.openlibrary.org/b/id/42-M.jpg");
+        books[0].Subjects.Should().Equal("Fantasy", "Fiction");
+        books[1].Subjects.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task LookupAsync_PreservesCatalogRelevanceOrder()
+    {
+        var handler = new MockHttpMessageHandler();
+        var response = new OpenLibrarySearchResult
+        {
+            Docs = new List<OpenLibraryDoc>
+            {
+                new() { Title = "Most Relevant", FirstPublishYear = 1937 },
+                new() { Title = "Newer But Less Relevant", FirstPublishYear = 2023 }
+            }
+        };
+
+        handler.When(HttpMethod.Get, "https://openlibrary.org/search.json*")
+            .Respond("application/json", JsonSerializer.Serialize(response));
+
+        var httpClient = handler.ToHttpClient();
+        httpClient.BaseAddress = new Uri("https://openlibrary.org/");
+        var service = new OpenLibraryLookupService(httpClient, NullLogger<OpenLibraryLookupService>.Instance);
+
+        BookLookupResult result = await service.LookupAsync("Test");
+        var books = result.Books.ToList();
+
+        books.Select(b => b.Title).Should().Equal("Most Relevant", "Newer But Less Relevant");
     }
 
     [Fact]
