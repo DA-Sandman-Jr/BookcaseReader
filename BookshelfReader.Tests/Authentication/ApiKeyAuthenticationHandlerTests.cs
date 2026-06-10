@@ -1,5 +1,5 @@
 using System.Text.Encodings.Web;
-using BookshelfReader.DependencyInjection.Authentication;
+using BookshelfReader.Extensions.Authentication;
 using FluentAssertions;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;

@@ -1,15 +1,15 @@
 # BookshelfReader
 
-BookshelfReader provides dependency injection helpers for wiring the bookshelf parsing pipeline (segmentation, OCR, parsing, genre classification, and Open Library lookup) into an existing ASP.NET Core application. Use the NuGet package; you do not need to run the included API host by itself. A runnable reference host lives in `BookshelfReader.Host` for local testing only and is not packaged. Only the `BookshelfReader.DependencyInjection` and `BookshelfReader.Api` projects are marked packable so `dotnet pack` emits just the NuGet payloads.
+BookshelfReader provides dependency injection helpers for wiring the bookshelf parsing pipeline (segmentation, OCR, parsing, genre classification, and Open Library lookup) into an existing ASP.NET Core application. Use the NuGet package; you do not need to run the included API host by itself. A runnable reference host lives in `BookshelfReader.Host` for local testing only and is not packaged. Only the `BookshelfReader.Extensions` and `BookshelfReader.Api` projects are marked packable so `dotnet pack` emits just the NuGet payloads.
 
 ## Consuming the NuGet package
 
-1. Reference the `BookshelfReader.DependencyInjection` package (and `BookshelfReader.Api` if you want the prebuilt endpoint mappings) from your ASP.NET Core project.
+1. Reference the `BookshelfReader.Extensions` package (and `BookshelfReader.Api` if you want the prebuilt endpoint mappings) from your ASP.NET Core project.
 2. In `Program.cs` add:
    ```csharp
    using BookshelfReader.Api.Extensions;
-   using BookshelfReader.DependencyInjection;
-   using BookshelfReader.DependencyInjection.Authentication;
+   using BookshelfReader.Extensions;
+   using BookshelfReader.Extensions.Authentication;
 
    builder.Services.AddBookshelfReader(builder.Configuration);
 
@@ -41,7 +41,7 @@ Embedders must provide OCR language data by placing `eng.traineddata` (or the la
 
 ```bash
 dotnet restore
-dotnet pack BookshelfReader.DependencyInjection/BookshelfReader.DependencyInjection.csproj \
+dotnet pack BookshelfReader.Extensions/BookshelfReader.Extensions.csproj \
   -c Release \
   -p:PackageVersion=1.0.0-beta1 \
   -p:IncludeSymbols=true \
@@ -55,7 +55,7 @@ dotnet pack BookshelfReader.Api/BookshelfReader.Api.csproj \
 # dotnet pack BookshelfReader.sln -c Release
 ```
 
-Publish the resulting `.nupkg` (and optional `.snupkg`) artifacts from `BookshelfReader.DependencyInjection` (and optionally `BookshelfReader.Api` for the endpoint mappings) to nuget.org with your API key. Mark prerelease versions with a suffix such as `-beta1`.
+Publish the resulting `.nupkg` (and optional `.snupkg`) artifacts from `BookshelfReader.Extensions` (and optionally `BookshelfReader.Api` for the endpoint mappings) to nuget.org with your API key. Mark prerelease versions with a suffix such as `-beta1`.
 
 ## Tests
 

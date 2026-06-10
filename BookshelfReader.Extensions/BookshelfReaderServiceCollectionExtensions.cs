@@ -1,6 +1,6 @@
 using BookshelfReader.Core.Abstractions;
 using BookshelfReader.Core.Options;
-using BookshelfReader.DependencyInjection.Authentication;
+using BookshelfReader.Extensions.Authentication;
 using BookshelfReader.Infrastructure.Enrichment;
 using BookshelfReader.Infrastructure.Genres;
 using BookshelfReader.Infrastructure.Lookup;
@@ -13,7 +13,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
-namespace BookshelfReader.DependencyInjection;
+namespace BookshelfReader.Extensions;
 
 public static class BookshelfReaderServiceCollectionExtensions
 {

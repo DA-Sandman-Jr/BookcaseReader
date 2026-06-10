@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 
-namespace BookshelfReader.DependencyInjection.Authentication;
+namespace BookshelfReader.Extensions.Authentication;
 
 internal static class ApiKeyValidator
 {
