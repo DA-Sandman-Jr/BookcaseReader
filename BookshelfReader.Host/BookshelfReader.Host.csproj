@@ -18,7 +18,9 @@
       DestinationFolder="$(MSBuildProjectDirectory)\tessdata"
       SkipUnchangedFiles="true" />
     <ItemGroup>
-      <None Include="$(MSBuildProjectDirectory)\tessdata\*.traineddata" Link="tessdata\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+      <None Include="$(MSBuildProjectDirectory)\tessdata\*.traineddata"
+            TargetPath="tessdata\%(Filename)%(Extension)"
+            CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
   </Target>
 </Project>
