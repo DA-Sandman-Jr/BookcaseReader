@@ -32,19 +32,19 @@ All routes are rooted at `/api` and described by the generated OpenAPI document 
   "books": [
     {
       "boundingBox": { "x": 0, "y": 0, "width": 0, "height": 0 },
-      "title": "…",
-      "author": "…",
-      "genres": ["…"],
+      "title": "...",
+      "author": "...",
+      "genres": ["..."],
       "confidence": 0.82,
-      "rawText": "…",
-      "notes": ["…"],
+      "rawText": "...",
+      "notes": ["..."],
       "metadata": {
-        "title": "…",
-        "author": "…",
+        "title": "...",
+        "author": "...",
         "publishYear": 1965,
-        "isbn": "…",
-        "coverUrl": "https://covers.openlibrary.org/b/id/…-M.jpg",
-        "subjects": ["…"]
+        "isbn": "...",
+        "coverUrl": "https://covers.openlibrary.org/b/id/...-M.jpg",
+        "subjects": ["..."]
       }
     }
   ],
@@ -56,9 +56,9 @@ All routes are rooted at `/api` and described by the generated OpenAPI document 
 }
 ```
 
-When enrichment is enabled (the default), the service looks up each parsed title against Open Library inside the parse request and attaches the best catalog match as `metadata` — canonical title, author, first publish year, ISBN, cover image URL, and subjects (which also feed the `genres` list). `metadata` is `null` when no confident match was found; the candidate's `notes` explain why (no results, low match score, or lookup failure). Callers that prefer to orchestrate their own lookups can set `Enrichment:Enabled` to `false` and use `/api/books/lookup` per title instead. Enrichment adds outbound Open Library calls to parse latency, so expect parse requests to take a few seconds longer for shelves with many readable spines.
+When enrichment is enabled (the default), the service looks up each parsed title against Open Library inside the parse request and attaches the best catalog match as `metadata` - canonical title, author, first publish year, ISBN, cover image URL, and subjects (which also feed the `genres` list). `metadata` is `null` when no confident match was found; the candidate's `notes` explain why (no results, low match score, or lookup failure). Callers that prefer to orchestrate their own lookups can set `Enrichment:Enabled` to `false` and use `/api/books/lookup` per title instead. Enrichment adds outbound Open Library calls to parse latency, so expect parse requests to take a few seconds longer for shelves with many readable spines.
 
-Requests that violate validation (missing file, unsupported MIME type, OCR failure, etc.) return `400` responses with RFC 7807 bodies. When `RequireApiKey` is enabled the parse endpoint also returns `401` for missing or invalid keys.
+Requests that violate validation (missing file, unsupported MIME type, OCR failure, etc.) return `400` responses with RFC 7807 bodies. When `RequireApiKey` is enabled the parse endpoint also returns `401` for missing or invalid keys, and when parse rate limiting is enabled it returns `429 Too Many Requests` plus a `Retry-After` header once callers exceed the configured limit.
 
 ## 2. Configuration & secrets
 
@@ -69,17 +69,20 @@ Configuration lives in `BookshelfReader.Host/appsettings.json` with environment-
 | `Authentication:ApiKey:HeaderName` | HTTP header that carries the credential. | `Authentication__ApiKey__HeaderName=X-API-Key`
 | `Authentication:ApiKey:RequireApiKey` | Enables API-key enforcement on `/api/bookshelf/parse`. | `Authentication__ApiKey__RequireApiKey=true`
 | `Authentication:ApiKey:ValidKeys` | List of accepted API keys. Omit in source control. | `Authentication__ApiKey__ValidKeys__0=<value>`
+| `RateLimiting:Parse:Enabled` | Enables per-IP rate limiting for `POST /api/bookshelf/parse` (default `false`). | `RateLimiting__Parse__Enabled=true`
+| `RateLimiting:Parse:PermitLimit` | Allowed parse requests per window before `429` is returned (default `10`). | `RateLimiting__Parse__PermitLimit=10`
+| `RateLimiting:Parse:WindowSeconds` | Length of the parse rate-limit window in seconds (default `60`). | `RateLimiting__Parse__WindowSeconds=60`
 | `OpenLibrary:BaseUrl` | Override Open Library endpoint (for mocks or future changes). | `OpenLibrary__BaseUrl=https://...`
 | `OpenLibrary:UserAgent` | Identifying `User-Agent` sent to Open Library, per their API guidelines. | `OpenLibrary__UserAgent=MyApp/1.0 (contact@example.com)`
 | `Enrichment:Enabled` | Attach Open Library metadata to parse results in-pipeline (default `true`). | `Enrichment__Enabled=true`
-| `Enrichment:MaxConcurrentLookups` | Concurrent Open Library lookups per parse request (1–16). | `Enrichment__MaxConcurrentLookups=4`
-| `Enrichment:MinMatchScore` | Minimum fuzzy match score (0–100) before metadata is attached. | `Enrichment__MinMatchScore=55`
+| `Enrichment:MaxConcurrentLookups` | Concurrent Open Library lookups per parse request (1-16). | `Enrichment__MaxConcurrentLookups=4`
+| `Enrichment:MinMatchScore` | Minimum fuzzy match score (0-100) before metadata is attached. | `Enrichment__MinMatchScore=55`
 | `Uploads:MaxBytes` | Maximum upload size in bytes. | `Uploads__MaxBytes=10485760`
 | `Uploads:AllowedContentTypes` | Canonical MIME types accepted from the form upload. | `Uploads__AllowedContentTypes__0=image/jpeg`
 | `Ocr:Tesseract:*` | File system path, languages, and concurrency for OCR. | `Ocr__Tesseract__DataPath=/app/tessdata`
 | `Segmentation:*` / `Parsing:*` | Heuristics controlling contour filtering and text parsing. | `Segmentation__MaxSegments=64`
 
-Production deployments should inject secrets through your platform’s secret store (Azure Key Vault, AWS Secrets Manager, GitHub Actions secrets → environment variables). Only ship sanitized sample values in source control. The development profile (`appsettings.Development.json`) demonstrates setting a disposable key (`local-dev-key`).
+Production deployments should inject secrets through your platform's secret store (Azure Key Vault, AWS Secrets Manager, GitHub Actions secrets to environment variables). Only ship sanitized sample values in source control. The development profile (`appsettings.Development.json`) demonstrates setting a disposable key (`local-dev-key`).
 
 ### Sample `.env` (development)
 
@@ -87,6 +90,7 @@ Production deployments should inject secrets through your platform’s secret st
 ASPNETCORE_ENVIRONMENT=Development
 Authentication__ApiKey__RequireApiKey=true
 Authentication__ApiKey__ValidKeys__0=local-dev-key
+RateLimiting__Parse__Enabled=true
 Ocr__Tesseract__DataPath=./tessdata
 ```
 
@@ -94,18 +98,18 @@ Load it with `dotnet user-secrets`, `direnv`, or your preferred tooling.
 
 ## 3. Integration contract
 
-1. **Authentication** – When `RequireApiKey` is `true`, callers must include `X-API-Key: <value>` (or your configured header) on every `POST /api/bookshelf/parse` request. The lookup endpoint is anonymous by default.
-2. **Payloads** – The upload endpoint requires `multipart/form-data` with a single `image` file field. JPEG and PNG inputs are accepted out of the box. The service streams files directly from the request and rejects payloads larger than the configured limit or whose signatures do not match the MIME type.
-3. **Response shape** – Use the `ParseResult` schema above. Bounding boxes are relative to the uploaded image, enabling downstream UI overlays.
-4. **Errors** – Validation problems use the standard ASP.NET Core RFC 7807 schema with `errors` dictionary. Treat 4xx codes as actionable client fixes and 5xx codes as transient failures worth retrying.
-5. **OpenAPI** – Consume `/swagger/v1/swagger.json` to generate typed clients (NSwag, AutoRest, openapi-typescript). Regenerate clients whenever the service bumps its version.
+1. **Authentication** - When `RequireApiKey` is `true`, callers must include `X-API-Key: <value>` (or your configured header) on every `POST /api/bookshelf/parse` request. The lookup endpoint is anonymous by default.
+2. **Payloads** - The upload endpoint requires `multipart/form-data` with a single `image` file field. JPEG and PNG inputs are accepted out of the box. The service streams files directly from the request and rejects payloads larger than the configured limit or whose signatures do not match the MIME type.
+3. **Response shape** - Use the `ParseResult` schema above. Bounding boxes are relative to the uploaded image, enabling downstream UI overlays.
+4. **Errors** - Validation problems use the standard ASP.NET Core RFC 7807 schema with `errors` dictionary. Treat `401` as missing or invalid credentials, `429` plus `Retry-After` as a rate-limit backoff signal, other 4xx codes as actionable client fixes, and 5xx codes as transient failures worth retrying.
+5. **OpenAPI** - Consume `/swagger/v1/swagger.json` to generate typed clients (NSwag, AutoRest, openapi-typescript). Regenerate clients whenever the service bumps its version.
 
 ### UI embedding
 
 BookshelfReader does not ship standalone UI assets. The recommended integration pattern is either:
 
-* **Reverse proxy** – Surface the API under your main site (e.g., `/api/bookshelf/*`) via a reverse proxy or API gateway.
-* **Iframe / widget** – Host your own UI and call the service from the browser via HTTPS. If you need cross-origin access, configure CORS in your host proxy; the service itself is locked down with strict security headers and same-origin policies.
+* **Reverse proxy** - Surface the API under your main site (e.g., `/api/bookshelf/*`) via a reverse proxy or API gateway.
+* **Iframe / widget** - Host your own UI and call the service from the browser via HTTPS. If you need cross-origin access, configure CORS in your host proxy; the service itself is locked down with strict security headers and same-origin policies.
 
 ## 4. Deployment boundaries
 
@@ -127,10 +131,10 @@ BookshelfReader does not ship standalone UI assets. The recommended integration 
 
 Troubleshooting tips:
 
-* **401 Unauthorized** – Confirm `RequireApiKey` is enabled only when you supply the header. Rotate keys via configuration without redeploying.
-* **400 Bad Request** – Ensure the file field name is exactly `image` and the MIME type is allowed.
-* **Large file rejection** – Increase `Uploads:MaxBytes` temporarily during debugging.
-* **OCR missing data** – Populate `Ocr:Tesseract:DataPath` with valid traineddata files.
+* **401 Unauthorized** - Confirm `RequireApiKey` is enabled only when you supply the header. Rotate keys via configuration without redeploying.
+* **400 Bad Request** - Ensure the file field name is exactly `image` and the MIME type is allowed.
+* **Large file rejection** - Increase `Uploads:MaxBytes` temporarily during debugging.
+* **OCR missing data** - Populate `Ocr:Tesseract:DataPath` with valid traineddata files. The service now fails the first parse request with a clear `InvalidOperationException` naming the missing path or language file, and the reference host self-provisions `tessdata/eng.traineddata` during build.
 
 ## 6. Validation & CI expectations
 
@@ -148,7 +152,7 @@ Consider publishing a Docker image (`dotnet publish -c Release -o out && docker 
 
 * Document API or response-shape changes in `CHANGELOG.md` or the README release notes section.
 * Publish GitHub releases summarizing changes. Include upgrade notes for contract-affecting updates.
-* For breaking changes, bump the major version and announce via your team’s communication channel (Slack, Teams, email).
+* For breaking changes, bump the major version and announce via your team's communication channel (Slack, Teams, email).
 * When introducing new optional fields, guard the behavior with feature flags so the host site can opt in safely.
 
 Following this guide will let you operate BookshelfReader as an autonomous service while providing a clear contract for your main site to call into whenever you are ready to embed bookshelf parsing features.
