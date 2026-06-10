@@ -1,5 +1,7 @@
 using BookshelfReader.Api.Endpoints;
+using BookshelfReader.Api.RateLimiting;
 using BookshelfReader.Api.Validation;
+using BookshelfReader.Core.Options;
 using BookshelfReader.DependencyInjection;
 using BookshelfReader.DependencyInjection.Authentication;
 using Microsoft.AspNetCore.Builder;
@@ -7,6 +9,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 
 namespace BookshelfReader.Api.Extensions;
 
@@ -17,6 +20,7 @@ public static class BookshelfReaderWebApplicationBuilderExtensions
         ArgumentNullException.ThrowIfNull(builder);
 
         builder.Services.AddBookshelfReader(builder.Configuration);
+        builder.Services.AddBookshelfReaderRateLimiting(builder.Configuration);
 
         builder.Services.AddAuthentication(options =>
             {
@@ -45,6 +49,11 @@ public static class BookshelfReaderWebApplicationBuilderExtensions
 
         app.UseAuthentication();
         app.UseAuthorization();
+
+        if (app.Services.GetRequiredService<IOptions<ParseRateLimitOptions>>().Value.Enabled)
+        {
+            app.UseRateLimiter();
+        }
 
         if (!app.Environment.IsDevelopment())
         {

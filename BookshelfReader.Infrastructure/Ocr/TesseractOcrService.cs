@@ -30,9 +30,25 @@ public sealed class TesseractOcrService : IOcrService, IDisposable
             : _options.DataPath;
         _language = _options.Language;
 
+        // Fail fast with an actionable message: TesseractEngine would otherwise
+        // throw a cryptic native initialization error on the first OCR request.
         if (!Directory.Exists(_dataPath))
         {
-            _logger.LogWarning("Tesseract data path '{Path}' not found. OCR results may be degraded.", _dataPath);
+            throw new InvalidOperationException(
+                $"Tesseract data path '{_dataPath}' was not found. Place traineddata files there " +
+                "(e.g. eng.traineddata from https://github.com/tesseract-ocr/tessdata_fast) or set " +
+                "Ocr:Tesseract:DataPath to the folder that contains them.");
+        }
+
+        foreach (string language in _language.Split('+', StringSplitOptions.RemoveEmptyEntries))
+        {
+            string languageFile = Path.Combine(_dataPath, $"{language}.traineddata");
+            if (!File.Exists(languageFile))
+            {
+                throw new InvalidOperationException(
+                    $"Tesseract language data '{languageFile}' was not found. Download it from " +
+                    "https://github.com/tesseract-ocr/tessdata_fast or adjust Ocr:Tesseract:Language.");
+            }
         }
 
         int parallelism = Math.Max(1, _options.MaxDegreeOfParallelism);
