@@ -37,7 +37,15 @@ All routes are rooted at `/api` and described by the generated OpenAPI document 
       "genres": ["…"],
       "confidence": 0.82,
       "rawText": "…",
-      "notes": ["…"]
+      "notes": ["…"],
+      "metadata": {
+        "title": "…",
+        "author": "…",
+        "publishYear": 1965,
+        "isbn": "…",
+        "coverUrl": "https://covers.openlibrary.org/b/id/…-M.jpg",
+        "subjects": ["…"]
+      }
     }
   ],
   "diagnostics": {
@@ -47,6 +55,8 @@ All routes are rooted at `/api` and described by the generated OpenAPI document 
   }
 }
 ```
+
+When enrichment is enabled (the default), the service looks up each parsed title against Open Library inside the parse request and attaches the best catalog match as `metadata` — canonical title, author, first publish year, ISBN, cover image URL, and subjects (which also feed the `genres` list). `metadata` is `null` when no confident match was found; the candidate's `notes` explain why (no results, low match score, or lookup failure). Callers that prefer to orchestrate their own lookups can set `Enrichment:Enabled` to `false` and use `/api/books/lookup` per title instead. Enrichment adds outbound Open Library calls to parse latency, so expect parse requests to take a few seconds longer for shelves with many readable spines.
 
 Requests that violate validation (missing file, unsupported MIME type, OCR failure, etc.) return `400` responses with RFC 7807 bodies. When `RequireApiKey` is enabled the parse endpoint also returns `401` for missing or invalid keys.
 
@@ -60,6 +70,10 @@ Configuration lives in `BookshelfReader.Host/appsettings.json` with environment-
 | `Authentication:ApiKey:RequireApiKey` | Enables API-key enforcement on `/api/bookshelf/parse`. | `Authentication__ApiKey__RequireApiKey=true`
 | `Authentication:ApiKey:ValidKeys` | List of accepted API keys. Omit in source control. | `Authentication__ApiKey__ValidKeys__0=<value>`
 | `OpenLibrary:BaseUrl` | Override Open Library endpoint (for mocks or future changes). | `OpenLibrary__BaseUrl=https://...`
+| `OpenLibrary:UserAgent` | Identifying `User-Agent` sent to Open Library, per their API guidelines. | `OpenLibrary__UserAgent=MyApp/1.0 (contact@example.com)`
+| `Enrichment:Enabled` | Attach Open Library metadata to parse results in-pipeline (default `true`). | `Enrichment__Enabled=true`
+| `Enrichment:MaxConcurrentLookups` | Concurrent Open Library lookups per parse request (1–16). | `Enrichment__MaxConcurrentLookups=4`
+| `Enrichment:MinMatchScore` | Minimum fuzzy match score (0–100) before metadata is attached. | `Enrichment__MinMatchScore=55`
 | `Uploads:MaxBytes` | Maximum upload size in bytes. | `Uploads__MaxBytes=10485760`
 | `Uploads:AllowedContentTypes` | Canonical MIME types accepted from the form upload. | `Uploads__AllowedContentTypes__0=image/jpeg`
 | `Ocr:Tesseract:*` | File system path, languages, and concurrency for OCR. | `Ocr__Tesseract__DataPath=/app/tessdata`

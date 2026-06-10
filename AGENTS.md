@@ -2,7 +2,7 @@
 
 # BookshelfReader - Agent Instructions
 
-BookshelfReader provides .NET 8 dependency-injection helpers and optional API endpoint mappings for a bookshelf image parsing pipeline: upload validation, segmentation, OCR, parsing, genre classification, and Open Library lookup.
+BookshelfReader provides .NET 8 dependency-injection helpers and optional API endpoint mappings for a bookshelf image parsing pipeline: upload validation, segmentation, OCR, parsing, genre classification, and Open Library lookup with in-pipeline metadata enrichment.
 
 ## Commands
 
@@ -56,6 +56,6 @@ dotnet pack BookshelfReader.sln -c Release
 
 ## Configuration Notes
 
-Important configuration sections include `Authentication:ApiKey`, `Uploads`, `OpenLibrary`, `Ocr:Tesseract`, `Segmentation`, and `Parsing`.
+Important configuration sections include `Authentication:ApiKey`, `Uploads`, `OpenLibrary`, `Enrichment`, `Ocr:Tesseract`, `Segmentation`, and `Parsing`.
 
 Read `docs/IntegrationGuide.md` before making integration, deployment, or host-embedding changes.
