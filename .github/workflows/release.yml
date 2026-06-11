@@ -1,0 +1,73 @@
+name: Release to NuGet
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish:
+    # windows-latest is required: the Infrastructure package pulls in the
+    # Windows-only native dependencies OpenCvSharp4.Windows and Tesseract.
+    runs-on: windows-latest
+
+    # Trusted Publishing: no long-lived API key. The job's OIDC token is
+    # exchanged for a one-hour nuget.org API key against the trusted publishing
+    # policy configured on nuget.org (repository owner DA-Sandman-Jr,
+    # repository BookcaseReader, workflow file release.yml).
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Derive version from tag
+        shell: bash
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Restore
+        run: dotnet restore BookshelfReader.sln
+
+      - name: Build
+        run: dotnet build BookshelfReader.sln --configuration Release --no-restore -p:Version=$env:VERSION
+
+      - name: Test
+        run: dotnet test BookshelfReader.sln --configuration Release --no-build --verbosity minimal
+
+      - name: Pack
+        run: dotnet pack BookshelfReader.sln --configuration Release --no-build -p:Version=$env:VERSION --output ./nupkgs
+
+      - name: Verify all four packages were produced
+        shell: pwsh
+        run: |
+          $expected = @(
+            "BookshelfReader.Core",
+            "BookshelfReader.Infrastructure",
+            "BookshelfReader.Extensions",
+            "BookshelfReader.Api"
+          )
+          $missing = $expected | Where-Object { -not (Test-Path "nupkgs/$_.$env:VERSION.nupkg") }
+          if ($missing.Count -gt 0) {
+            throw "Missing expected packages:`n$($missing -join "`n")"
+          }
+
+      # Request the temp key right before the push; it expires after an hour.
+      - name: NuGet login (OIDC -> temp API key)
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      - name: Push packages to nuget.org
+        run: >
+          dotnet nuget push "nupkgs/*.nupkg"
+          --api-key "${{ steps.login.outputs.NUGET_API_KEY }}"
+          --source https://api.nuget.org/v3/index.json
+          --skip-duplicate

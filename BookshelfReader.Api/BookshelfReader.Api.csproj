@@ -4,7 +4,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <IsPackable>true</IsPackable>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageId>BookshelfReader.Api</PackageId>
+    <Description>Endpoint-mapping helpers for the BookshelfReader pipeline. Call MapBookshelfReaderApi() to expose the /api/bookshelf/parse and /api/books/lookup endpoints from an ASP.NET Core app.</Description>
   </PropertyGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
