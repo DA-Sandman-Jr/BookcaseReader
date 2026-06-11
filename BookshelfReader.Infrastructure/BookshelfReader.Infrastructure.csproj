@@ -10,12 +10,23 @@
   <ItemGroup>
     <None Include="..\README.md" Pack="true" PackagePath="\" Link="README.md" />
   </ItemGroup>
+  <!-- Bundle the Tesseract native DLLs (resolved from the restored Tesseract
+       package) and a buildTransitive targets file into this package, so
+       transitive consumers get the natives the charlesw loader needs. See
+       buildTransitive\BookshelfReader.Infrastructure.targets. -->
+  <ItemGroup>
+    <None Include="$(PkgTesseract)\x64\tesseract50.dll" Pack="true" PackagePath="buildTransitive\tesseract\x64\" Visible="false" />
+    <None Include="$(PkgTesseract)\x64\leptonica-1.82.0.dll" Pack="true" PackagePath="buildTransitive\tesseract\x64\" Visible="false" />
+    <None Include="$(PkgTesseract)\x86\tesseract50.dll" Pack="true" PackagePath="buildTransitive\tesseract\x86\" Visible="false" />
+    <None Include="$(PkgTesseract)\x86\leptonica-1.82.0.dll" Pack="true" PackagePath="buildTransitive\tesseract\x86\" Visible="false" />
+    <None Include="buildTransitive\BookshelfReader.Infrastructure.targets" Pack="true" PackagePath="buildTransitive\" Visible="false" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\BookshelfReader.Core\BookshelfReader.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="OpenCvSharp4.Windows" Version="4.10.0.20240616" />
-    <PackageReference Include="Tesseract" Version="5.2.0" />
+    <PackageReference Include="Tesseract" Version="5.2.0" GeneratePathProperty="true" />
     <PackageReference Include="FuzzySharp" Version="2.0.2" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.3" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.2" />
