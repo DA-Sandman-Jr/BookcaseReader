@@ -13,6 +13,10 @@ BookshelfReader provides dependency injection helpers for wiring the bookshelf p
 
    builder.Services.AddBookshelfReader(builder.Configuration);
 
+   // Required when you map the endpoints yourself: registers the image upload
+   // validation/handling services that MapBookshelfReaderApi() depends on.
+   builder.Services.AddBookshelfReaderApi();
+
    builder.Services
        .AddAuthentication(options =>
        {

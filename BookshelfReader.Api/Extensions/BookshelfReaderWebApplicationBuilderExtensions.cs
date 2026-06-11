@@ -1,6 +1,5 @@
 using BookshelfReader.Api.Endpoints;
 using BookshelfReader.Api.RateLimiting;
-using BookshelfReader.Api.Validation;
 using BookshelfReader.Core.Options;
 using BookshelfReader.Extensions;
 using BookshelfReader.Extensions.Authentication;
@@ -34,8 +33,7 @@ public static class BookshelfReaderWebApplicationBuilderExtensions
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddSwaggerGen();
 
-        builder.Services.AddSingleton<IImageUploadValidator, ImageUploadValidator>();
-        builder.Services.AddSingleton<IImageUploadRequestHandler, ImageUploadRequestHandler>();
+        builder.Services.AddBookshelfReaderApi();
 
         return builder;
     }

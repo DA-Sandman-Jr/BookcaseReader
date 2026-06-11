@@ -2,8 +2,8 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using BookshelfReader.Api.Endpoints;
+using BookshelfReader.Api.Extensions;
 using BookshelfReader.Api.RateLimiting;
-using BookshelfReader.Api.Validation;
 using BookshelfReader.Core.Abstractions;
 using BookshelfReader.Core.Models;
 using BookshelfReader.Extensions;
@@ -157,8 +157,7 @@ public class BookshelfReaderApiIntegrationTests
             })
             .AddBookshelfReaderApiKey();
         builder.Services.AddAuthorization();
-        builder.Services.AddSingleton<IImageUploadValidator, ImageUploadValidator>();
-        builder.Services.AddSingleton<IImageUploadRequestHandler, ImageUploadRequestHandler>();
+        builder.Services.AddBookshelfReaderApi();
 
         builder.Services.Replace(ServiceDescriptor.Singleton<IOcrService>(new StubOcrService()));
         builder.Services.Replace(ServiceDescriptor.Singleton<IBookLookupService>(new StubBookLookupService()));
