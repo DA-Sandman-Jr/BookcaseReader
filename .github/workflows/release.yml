@@ -65,9 +65,14 @@ jobs:
         with:
           user: ${{ secrets.NUGET_USER }}
 
+      # Enumerate explicitly: dotnet nuget push does not expand wildcards on
+      # Windows/pwsh the way it does on Linux.
       - name: Push packages to nuget.org
-        run: >
-          dotnet nuget push "nupkgs/*.nupkg"
-          --api-key "${{ steps.login.outputs.NUGET_API_KEY }}"
-          --source https://api.nuget.org/v3/index.json
-          --skip-duplicate
+        shell: pwsh
+        run: |
+          foreach ($pkg in Get-ChildItem -Path nupkgs -Filter *.nupkg) {
+            dotnet nuget push $pkg.FullName `
+              --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" `
+              --source https://api.nuget.org/v3/index.json `
+              --skip-duplicate
+          }
