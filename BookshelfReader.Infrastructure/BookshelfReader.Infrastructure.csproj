@@ -3,7 +3,13 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <IsPackable>true</IsPackable>
+    <PackageId>BookshelfReader.Infrastructure</PackageId>
+    <Description>Concrete BookshelfReader pipeline implementations: OpenCV segmentation, Tesseract OCR, spine parsing, genre classification, and Open Library lookup with metadata enrichment. Pulls in Windows-only native dependencies (OpenCvSharp4.Windows, Tesseract).</Description>
   </PropertyGroup>
+  <ItemGroup>
+    <None Include="..\README.md" Pack="true" PackagePath="\" Link="README.md" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\BookshelfReader.Core\BookshelfReader.Core.csproj" />
   </ItemGroup>

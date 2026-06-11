@@ -4,8 +4,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>true</IsPackable>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageId>BookshelfReader.Extensions</PackageId>
+    <Description>Dependency-injection helpers for the BookshelfReader pipeline. Call AddBookshelfReader() to wire upload validation, segmentation, OCR, parsing, genre classification, and Open Library enrichment into an ASP.NET Core app, plus optional API-key auth and parse rate limiting.</Description>
     <AssemblyName>BookshelfReader.Extensions</AssemblyName>
     <RootNamespace>BookshelfReader.Extensions</RootNamespace>
   </PropertyGroup>

@@ -29,20 +29,19 @@ jobs:
       - name: Test
         run: dotnet test BookshelfReader.sln -c Release --no-build --verbosity minimal
 
-      - name: Pack API package
-        run: dotnet pack BookshelfReader.Api/BookshelfReader.Api.csproj -c Release --no-build
+      - name: Pack packages
+        run: dotnet pack BookshelfReader.sln -c Release --no-build --output ./nupkgs
 
-      - name: Pack Extensions package
-        run: dotnet pack BookshelfReader.Extensions/BookshelfReader.Extensions.csproj -c Release --no-build
-
-      - name: Verify package count
+      - name: Verify all four packages were produced
         shell: pwsh
         run: |
-          $packages = @(
-            "BookshelfReader.Api/bin/Release/BookshelfReader.Api.1.0.0.nupkg",
-            "BookshelfReader.Extensions/bin/Release/BookshelfReader.Extensions.1.0.0.nupkg"
+          $expected = @(
+            "BookshelfReader.Core",
+            "BookshelfReader.Infrastructure",
+            "BookshelfReader.Extensions",
+            "BookshelfReader.Api"
           )
-          $missing = $packages | Where-Object { -not (Test-Path $_) }
+          $missing = $expected | Where-Object { (Get-ChildItem "nupkgs/$_.*.nupkg" -ErrorAction SilentlyContinue).Count -eq 0 }
           if ($missing.Count -gt 0) {
             throw "Missing expected packages:`n$($missing -join "`n")"
           }
@@ -51,7 +50,5 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: nuget-packages
-          path: |
-            BookshelfReader.Api/bin/Release/BookshelfReader.Api.1.0.0.nupkg
-            BookshelfReader.Extensions/bin/Release/BookshelfReader.Extensions.1.0.0.nupkg
+          path: nupkgs/*.nupkg
           if-no-files-found: error
