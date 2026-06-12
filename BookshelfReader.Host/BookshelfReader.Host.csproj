@@ -6,7 +6,10 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\BookshelfReader.Api\BookshelfReader.Api.csproj" />
+    <ProjectReference Include="..\BookshelfReader\BookshelfReader.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.9.0" />
   </ItemGroup>
   <!-- Fetch English OCR training data on first build so the reference host
        works out of the box. The file is gitignored; delete the tessdata folder

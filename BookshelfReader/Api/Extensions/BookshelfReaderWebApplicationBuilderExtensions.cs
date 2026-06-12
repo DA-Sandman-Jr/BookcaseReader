@@ -30,9 +30,6 @@ public static class BookshelfReaderWebApplicationBuilderExtensions
             .AddBookshelfReaderApiKey();
         builder.Services.AddAuthorization();
 
-        builder.Services.AddEndpointsApiExplorer();
-        builder.Services.AddSwaggerGen();
-
         builder.Services.AddBookshelfReaderApi();
 
         return builder;
@@ -61,12 +58,6 @@ public static class BookshelfReaderWebApplicationBuilderExtensions
         app.UseHttpsRedirection();
 
         app.Use(SetSecurityHeadersAsync);
-
-        if (app.Environment.IsDevelopment())
-        {
-            app.UseSwagger();
-            app.UseSwaggerUI();
-        }
 
         app.MapBookshelfReaderApi();
 

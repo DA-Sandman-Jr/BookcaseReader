@@ -4,8 +4,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>true</IsPackable>
-    <PackageId>BookshelfReader.Infrastructure</PackageId>
-    <Description>Concrete BookshelfReader pipeline implementations: OpenCV segmentation, Tesseract OCR, spine parsing, genre classification, and Open Library lookup with metadata enrichment. Pulls in Windows-only native dependencies (OpenCvSharp4.Windows, Tesseract).</Description>
+    <PackageId>BookshelfReader</PackageId>
+    <RootNamespace>BookshelfReader</RootNamespace>
+    <Description>Dependency-injection helpers and API endpoint mappings for a bookshelf image parsing pipeline: upload validation, OpenCV segmentation, Tesseract OCR, spine parsing, genre classification, and Open Library lookup with in-pipeline metadata enrichment. Call AddBookshelfReader() and AddBookshelfReaderApi() to wire the pipeline into an ASP.NET Core app, plus optional API-key auth (AddBookshelfReaderApiKey()) and parse rate limiting (AddBookshelfReaderRateLimiting()). Pulls in Windows-only native dependencies (OpenCvSharp4.Windows, Tesseract).</Description>
   </PropertyGroup>
   <ItemGroup>
     <None Include="..\README.md" Pack="true" PackagePath="\" Link="README.md" />
@@ -13,16 +14,16 @@
   <!-- Bundle the Tesseract native DLLs (resolved from the restored Tesseract
        package) and a buildTransitive targets file into this package, so
        transitive consumers get the natives the charlesw loader needs. See
-       buildTransitive\BookshelfReader.Infrastructure.targets. -->
+       buildTransitive\BookshelfReader.targets. -->
   <ItemGroup>
     <None Include="$(PkgTesseract)\x64\tesseract50.dll" Pack="true" PackagePath="buildTransitive\tesseract\x64\" Visible="false" />
     <None Include="$(PkgTesseract)\x64\leptonica-1.82.0.dll" Pack="true" PackagePath="buildTransitive\tesseract\x64\" Visible="false" />
     <None Include="$(PkgTesseract)\x86\tesseract50.dll" Pack="true" PackagePath="buildTransitive\tesseract\x86\" Visible="false" />
     <None Include="$(PkgTesseract)\x86\leptonica-1.82.0.dll" Pack="true" PackagePath="buildTransitive\tesseract\x86\" Visible="false" />
-    <None Include="buildTransitive\BookshelfReader.Infrastructure.targets" Pack="true" PackagePath="buildTransitive\" Visible="false" />
+    <None Include="buildTransitive\BookshelfReader.targets" Pack="true" PackagePath="buildTransitive\" Visible="false" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\BookshelfReader.Core\BookshelfReader.Core.csproj" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="OpenCvSharp4.Windows" Version="4.10.0.20240616" />
@@ -30,5 +31,8 @@
     <PackageReference Include="FuzzySharp" Version="2.0.2" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.3" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="8.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.28" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
   </ItemGroup>
 </Project>
