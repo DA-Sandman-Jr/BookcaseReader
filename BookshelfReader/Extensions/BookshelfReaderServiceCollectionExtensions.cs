@@ -52,6 +52,13 @@ public static class BookshelfReaderServiceCollectionExtensions
             .Configure<IOptions<UploadsOptions>>((formOptions, uploadOptions) =>
             {
                 formOptions.MultipartBodyLengthLimit = uploadOptions.Value.MaxBytes;
+
+                // Keep uploads fully in memory: the form feature buffers multipart
+                // sections larger than MemoryBufferThreshold (default 64 KB) to temp
+                // files on disk, which would break the guarantee that uploaded images
+                // are never stored. MaxBytes is validated at <= 20 MB above, so the
+                // cast is safe and per-request memory stays bounded.
+                formOptions.MemoryBufferThreshold = (int)Math.Min(uploadOptions.Value.MaxBytes, int.MaxValue);
             });
 
         services.Configure<TesseractOcrOptions>(configuration.GetSection(TesseractOcrOptions.SectionName));
