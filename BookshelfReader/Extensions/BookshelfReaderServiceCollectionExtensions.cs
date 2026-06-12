@@ -4,10 +4,8 @@ using BookshelfReader.Extensions.Authentication;
 using BookshelfReader.Infrastructure.Enrichment;
 using BookshelfReader.Infrastructure.Genres;
 using BookshelfReader.Infrastructure.Lookup;
-using BookshelfReader.Infrastructure.Ocr;
-using BookshelfReader.Infrastructure.Parsing;
 using BookshelfReader.Infrastructure.Processing;
-using BookshelfReader.Infrastructure.Segmentation;
+using BookshelfReader.Infrastructure.VisionLlm;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,6 +15,8 @@ namespace BookshelfReader.Extensions;
 
 public static class BookshelfReaderServiceCollectionExtensions
 {
+    private const string AnthropicVersion = "2023-06-01";
+
     public static IServiceCollection AddBookshelfReader(this IServiceCollection services, IConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(services);
@@ -46,6 +46,8 @@ public static class BookshelfReaderServiceCollectionExtensions
             .Validate(options => options.AllowedContentTypes is { Count: > 0 }
                 && options.AllowedContentTypes.All(UploadsOptions.IsSupportedContentType),
                 $"Uploads:AllowedContentTypes must contain only supported image MIME types ({string.Join(", ", UploadsOptions.SupportedImageSignatures.Keys)}).")
+            .Validate(options => options.MaxImagePixels is > 0 and <= 50_000_000,
+                "Uploads:MaxImagePixels must be between 1 and 50,000,000.")
             .ValidateOnStart();
 
         services.AddOptions<FormOptions>()
@@ -61,13 +63,25 @@ public static class BookshelfReaderServiceCollectionExtensions
                 formOptions.MemoryBufferThreshold = (int)Math.Min(uploadOptions.Value.MaxBytes, int.MaxValue);
             });
 
-        services.Configure<TesseractOcrOptions>(configuration.GetSection(TesseractOcrOptions.SectionName));
-        services.AddOptions<SegmentationOptions>()
-            .Bind(configuration.GetSection(SegmentationOptions.SectionName))
-            .Validate(options => options.MaxImagePixels is > 0 and <= 50_000_000,
-                "Segmentation:MaxImagePixels must be between 1 and 50,000,000.")
+        services.AddOptions<ClaudeVisionOptions>()
+            .Bind(configuration.GetSection(ClaudeVisionOptions.SectionName))
+            .PostConfigure(options =>
+            {
+                if (string.IsNullOrWhiteSpace(options.ApiKey))
+                {
+                    options.ApiKey = Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY") ?? string.Empty;
+                }
+            })
+            .Validate(options => !string.IsNullOrWhiteSpace(options.ApiKey),
+                "ClaudeVision:ApiKey must be configured, or set the ANTHROPIC_API_KEY environment variable.")
+            .Validate(options => Uri.TryCreate(options.BaseUrl, UriKind.Absolute, out Uri? baseUri)
+                    && string.Equals(baseUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase),
+                "ClaudeVision:BaseUrl must be an absolute https URL.")
+            .Validate(options => !string.IsNullOrWhiteSpace(options.Model), "ClaudeVision:Model must be configured.")
+            .Validate(options => options.MaxTokens > 0, "ClaudeVision:MaxTokens must be greater than 0.")
+            .Validate(options => options.TimeoutSeconds > 0, "ClaudeVision:TimeoutSeconds must be greater than 0.")
+            .Validate(options => options.MaxImageDimension > 0, "ClaudeVision:MaxImageDimension must be greater than 0.")
             .ValidateOnStart();
-        services.Configure<ParsingOptions>(configuration.GetSection(ParsingOptions.SectionName));
 
         services.AddOptions<EnrichmentOptions>()
             .Bind(configuration.GetSection(EnrichmentOptions.SectionName))
@@ -77,13 +91,24 @@ public static class BookshelfReaderServiceCollectionExtensions
                 "Enrichment:MinMatchScore must be between 0 and 100.")
             .ValidateOnStart();
 
-        services.AddSingleton<IBookSegmentationService, OpenCvBookSegmentationService>();
-        services.AddSingleton<IOcrService, TesseractOcrService>();
-        services.AddSingleton<IBookParsingService, BookParsingService>();
         services.AddSingleton<IGenreClassifier, KeywordGenreClassifier>();
-        services.AddSingleton<IBookSegmentProcessor, BookSegmentProcessor>();
         services.AddSingleton<IBookEnrichmentService, BookEnrichmentService>();
         services.AddSingleton<IBookshelfProcessingService, BookshelfProcessingService>();
+
+        services.AddHttpClient<IVisionBookReader, ClaudeVisionBookReader>((provider, client) =>
+        {
+            ClaudeVisionOptions options = provider.GetRequiredService<IOptions<ClaudeVisionOptions>>().Value;
+
+            if (!Uri.TryCreate(options.BaseUrl, UriKind.Absolute, out Uri? baseUri))
+            {
+                throw new InvalidOperationException("ClaudeVision:BaseUrl must be a valid absolute URI.");
+            }
+
+            client.BaseAddress = baseUri;
+            client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+            client.DefaultRequestHeaders.TryAddWithoutValidation("x-api-key", options.ApiKey);
+            client.DefaultRequestHeaders.TryAddWithoutValidation("anthropic-version", AnthropicVersion);
+        });
 
         services.AddHttpClient<IBookLookupService, OpenLibraryLookupService>((_, client) =>
         {

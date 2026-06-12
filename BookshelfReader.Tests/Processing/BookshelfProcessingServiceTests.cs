@@ -1,5 +1,7 @@
 using BookshelfReader.Core.Abstractions;
 using BookshelfReader.Core.Models;
+using BookshelfReader.Core.Options;
+using BookshelfReader.Infrastructure.Genres;
 using BookshelfReader.Infrastructure.Processing;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -10,63 +12,96 @@ namespace BookshelfReader.Tests.Processing;
 public class BookshelfProcessingServiceTests
 {
     [Fact]
-    public async Task ProcessAsync_WhenSegmentProcessingFails_ContinuesWithOtherSegments()
+    public async Task ProcessAsync_MapsVisionResultsToCandidatesAndEnrichesThem()
     {
-        var segments = new List<BookSegment>
+        var visionReader = new StubVisionBookReader(new VisionReadResult
         {
-            new() { BoundingBox = new Rect(0, 0, 10, 10), ImageData = new byte[] { 1 } },
-            new() { BoundingBox = new Rect(10, 0, 10, 10), ImageData = new byte[] { 2 } }
-        };
-
-        var segmentationService = new StubSegmentationService(segments);
-        var segmentProcessor = new SequenceSegmentProcessor(new[]
-        {
-            new SegmentProcessingResult(new BookCandidate { Title = "First" }, Array.Empty<string>()),
-            SegmentProcessingResult.Failure("boom")
+            Books =
+            {
+                new VisionBookEntry("Dune", "Frank Herbert", 0.95),
+                new VisionBookEntry("Foundation", "", 0.6)
+            }
         });
 
         var enrichmentService = new RecordingEnrichmentService();
-        var service = new BookshelfProcessingService(
-            segmentationService,
-            segmentProcessor,
-            enrichmentService,
-            NullLogger<BookshelfProcessingService>.Instance);
+        BookshelfProcessingService service = CreateService(visionReader, enrichmentService);
+
+        using var stream = new MemoryStream(new byte[] { 1, 2, 3 });
+        ParseResult result = await service.ProcessAsync(stream);
+
+        result.Books.Should().HaveCount(2);
+
+        result.Books[0].Title.Should().Be("Dune");
+        result.Books[0].Author.Should().Be("Frank Herbert");
+        result.Books[0].Confidence.Should().Be(0.95);
+        result.Books[0].RawText.Should().Be("Dune — Frank Herbert");
+        result.Books[0].BoundingBox.IsEmpty.Should().BeTrue();
+        result.Books[0].Notes.Should().ContainSingle(note => note.Contains("claude-haiku-4-5"));
+
+        result.Books[1].Title.Should().Be("Foundation");
+        result.Books[1].Author.Should().BeEmpty();
+        result.Books[1].RawText.Should().Be("Foundation");
+
+        result.Diagnostics.SegmentCount.Should().Be(2);
+
+        enrichmentService.Received.Should().NotBeNull();
+        enrichmentService.Received.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_WhenNoBooksFound_SkipsEnrichmentAndReturnsEmptyResult()
+    {
+        var visionReader = new StubVisionBookReader(new VisionReadResult());
+        var enrichmentService = new RecordingEnrichmentService();
+        BookshelfProcessingService service = CreateService(visionReader, enrichmentService);
 
         using var stream = new MemoryStream();
         ParseResult result = await service.ProcessAsync(stream);
 
-        result.Books.Should().HaveCount(1);
-        result.Books.Single().Title.Should().Be("First");
-        result.Diagnostics.SegmentCount.Should().Be(2);
-        result.Diagnostics.Notes.Should().ContainSingle(note => note.Contains("Segment 1") && note.Contains("boom"));
+        result.Books.Should().BeEmpty();
+        result.Diagnostics.SegmentCount.Should().Be(0);
+        enrichmentService.Received.Should().BeNull();
     }
 
     [Fact]
-    public async Task ProcessAsync_PassesParsedCandidatesToEnrichment()
+    public async Task ProcessAsync_IncludesVisionNotesInDiagnostics()
     {
-        var segments = new List<BookSegment>
+        var visionReader = new StubVisionBookReader(new VisionReadResult
         {
-            new() { BoundingBox = new Rect(0, 0, 10, 10), ImageData = new byte[] { 1 } }
-        };
-
-        var segmentationService = new StubSegmentationService(segments);
-        var segmentProcessor = new SequenceSegmentProcessor(new[]
-        {
-            new SegmentProcessingResult(new BookCandidate { Title = "First" }, Array.Empty<string>())
+            Notes = { "The vision model response was truncated at the configured token limit; some books may be missing." }
         });
 
-        var enrichmentService = new RecordingEnrichmentService();
-        var service = new BookshelfProcessingService(
-            segmentationService,
-            segmentProcessor,
-            enrichmentService,
-            NullLogger<BookshelfProcessingService>.Instance);
+        BookshelfProcessingService service = CreateService(visionReader, new RecordingEnrichmentService());
 
         using var stream = new MemoryStream();
-        await service.ProcessAsync(stream);
+        ParseResult result = await service.ProcessAsync(stream);
 
-        enrichmentService.Received.Should().NotBeNull();
-        enrichmentService.Received.Should().ContainSingle(candidate => candidate.Title == "First");
+        result.Diagnostics.Notes.Should().ContainSingle(note => note.Contains("truncated"));
+    }
+
+    private static BookshelfProcessingService CreateService(
+        IVisionBookReader visionBookReader,
+        IBookEnrichmentService enrichmentService)
+    {
+        return new BookshelfProcessingService(
+            visionBookReader,
+            new KeywordGenreClassifier(),
+            enrichmentService,
+            Microsoft.Extensions.Options.Options.Create(new ClaudeVisionOptions()),
+            NullLogger<BookshelfProcessingService>.Instance);
+    }
+
+    private sealed class StubVisionBookReader : IVisionBookReader
+    {
+        private readonly VisionReadResult _result;
+
+        public StubVisionBookReader(VisionReadResult result)
+        {
+            _result = result;
+        }
+
+        public Task<VisionReadResult> ReadAsync(byte[] imageData, CancellationToken cancellationToken = default)
+            => Task.FromResult(_result);
     }
 
     private sealed class RecordingEnrichmentService : IBookEnrichmentService
@@ -77,39 +112,6 @@ public class BookshelfProcessingServiceTests
         {
             Received = candidates;
             return Task.CompletedTask;
-        }
-    }
-
-    private sealed class StubSegmentationService : IBookSegmentationService
-    {
-        private readonly IReadOnlyList<BookSegment> _segments;
-
-        public StubSegmentationService(IReadOnlyList<BookSegment> segments)
-        {
-            _segments = segments;
-        }
-
-        public Task<IReadOnlyList<BookSegment>> SegmentAsync(Stream imageStream, CancellationToken cancellationToken = default)
-            => Task.FromResult(_segments);
-    }
-
-    private sealed class SequenceSegmentProcessor : IBookSegmentProcessor
-    {
-        private readonly Queue<SegmentProcessingResult> _results;
-
-        public SequenceSegmentProcessor(IEnumerable<SegmentProcessingResult> results)
-        {
-            _results = new Queue<SegmentProcessingResult>(results);
-        }
-
-        public Task<SegmentProcessingResult> ProcessAsync(BookSegment segment, int index, Guid imageId, CancellationToken cancellationToken)
-        {
-            if (_results.Count == 0)
-            {
-                throw new InvalidOperationException("No segment results configured.");
-            }
-
-            return Task.FromResult(_results.Dequeue());
         }
     }
 }

@@ -15,13 +15,9 @@ namespace BookshelfReader.Tests.Validation;
 
 public class ImageUploadValidatorTests
 {
-    private static ImageUploadValidator CreateValidator(
-        UploadsOptions? uploadsOptions = null,
-        SegmentationOptions? segmentationOptions = null)
+    private static ImageUploadValidator CreateValidator(UploadsOptions? uploadsOptions = null)
     {
-        return new ImageUploadValidator(
-            OptionsFactory.Create(uploadsOptions ?? new UploadsOptions()),
-            OptionsFactory.Create(segmentationOptions ?? new SegmentationOptions()));
+        return new ImageUploadValidator(OptionsFactory.Create(uploadsOptions ?? new UploadsOptions()));
     }
 
     [Fact]
@@ -95,8 +91,8 @@ public class ImageUploadValidatorTests
     [Fact]
     public void ValidateImageMetadata_WhenPixelCountExceedsLimit_ReturnsProblem()
     {
-        var segmentationOptions = new SegmentationOptions { MaxImagePixels = 10 };
-        ImageUploadValidator validator = CreateValidator(segmentationOptions: segmentationOptions);
+        var uploadsOptions = new UploadsOptions { MaxImagePixels = 10 };
+        ImageUploadValidator validator = CreateValidator(uploadsOptions);
         using var stream = new MemoryStream(CreateValidImageBytes(width: 4, height: 4));
 
         ValidationProblem? result = validator.ValidateImageMetadata(stream);

@@ -133,7 +133,8 @@ public class BookshelfReaderApiIntegrationTests
             ["Authentication:ApiKey:ValidKeys:0"] = ApiKey,
             ["RateLimiting:Parse:Enabled"] = rateLimitingEnabled.ToString(),
             ["RateLimiting:Parse:PermitLimit"] = permitLimit.ToString(),
-            ["RateLimiting:Parse:WindowSeconds"] = "60"
+            ["RateLimiting:Parse:WindowSeconds"] = "60",
+            ["ClaudeVision:ApiKey"] = "integration-test-key"
         };
     }
 
@@ -159,7 +160,7 @@ public class BookshelfReaderApiIntegrationTests
         builder.Services.AddAuthorization();
         builder.Services.AddBookshelfReaderApi();
 
-        builder.Services.Replace(ServiceDescriptor.Singleton<IOcrService>(new StubOcrService()));
+        builder.Services.Replace(ServiceDescriptor.Singleton<IVisionBookReader>(new StubVisionBookReader()));
         builder.Services.Replace(ServiceDescriptor.Singleton<IBookLookupService>(new StubBookLookupService()));
 
         WebApplication app = builder.Build();
@@ -199,11 +200,11 @@ public class BookshelfReaderApiIntegrationTests
         return await client.SendAsync(request);
     }
 
-    private sealed class StubOcrService : IOcrService
+    private sealed class StubVisionBookReader : IVisionBookReader
     {
-        public Task<OcrResult> RecognizeAsync(byte[] imageData, CancellationToken cancellationToken = default)
+        public Task<VisionReadResult> ReadAsync(byte[] imageData, CancellationToken cancellationToken = default)
         {
-            return Task.FromResult(new OcrResult());
+            return Task.FromResult(new VisionReadResult());
         }
     }
 

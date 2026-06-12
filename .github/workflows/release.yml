@@ -8,7 +8,7 @@ on:
 jobs:
   publish:
     # windows-latest is required: the Infrastructure package pulls in the
-    # Windows-only native dependencies OpenCvSharp4.Windows and Tesseract.
+    # Windows-only native dependency OpenCvSharp4.Windows.
     runs-on: windows-latest
 
     # Trusted Publishing: no long-lived API key. The job's OIDC token is
