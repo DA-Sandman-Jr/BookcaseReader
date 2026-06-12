@@ -2,6 +2,7 @@ using BookshelfReader.Core.Abstractions;
 using BookshelfReader.Extensions;
 using BookshelfReader.Extensions.Authentication;
 using FluentAssertions;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -92,6 +93,26 @@ public class BookshelfReaderServiceCollectionExtensionsTests
 
         act.Should().Throw<OptionsValidationException>()
             .WithMessage("*At least one non-empty API key must be configured when API keys are required.*");
+    }
+
+    [Fact]
+    public void AddBookshelfReader_ConfiguresFormOptionsToKeepUploadsInMemory()
+    {
+        IConfigurationRoot configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Uploads:MaxBytes"] = "1048576",
+            ["Uploads:AllowedContentTypes:0"] = "image/jpeg"
+        }).Build();
+
+        var services = new ServiceCollection();
+        services.AddBookshelfReader(configuration);
+
+        ServiceProvider provider = services.BuildServiceProvider();
+
+        FormOptions formOptions = provider.GetRequiredService<IOptions<FormOptions>>().Value;
+
+        formOptions.MultipartBodyLengthLimit.Should().Be(1048576);
+        formOptions.MemoryBufferThreshold.Should().Be(1048576);
     }
 
     [Fact]
