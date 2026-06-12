@@ -1,6 +1,8 @@
 using BookshelfReader.Core.Abstractions;
+using BookshelfReader.Core.Options;
 using BookshelfReader.Extensions;
 using BookshelfReader.Extensions.Authentication;
+using BookshelfReader.Infrastructure.VisionLlm;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.Configuration;
@@ -20,8 +22,7 @@ public class BookshelfReaderServiceCollectionExtensionsTests
             ["Authentication:ApiKey:RequireApiKey"] = "false",
             ["Uploads:MaxBytes"] = "1048576",
             ["Uploads:AllowedContentTypes:0"] = "image/jpeg",
-            ["Uploads:AllowedContentTypes:1"] = "image/png",
-            ["Segmentation:MaxImagePixels"] = "1000000"
+            ["Uploads:AllowedContentTypes:1"] = "image/png"
         }).Build();
 
         var services = new ServiceCollection();
@@ -29,11 +30,11 @@ public class BookshelfReaderServiceCollectionExtensionsTests
         services.Invoking(s => s.AddBookshelfReader(configuration))
             .Should().NotThrow();
 
-        services.Should().Contain(descriptor => descriptor.ServiceType == typeof(IBookSegmentationService));
-        services.Should().Contain(descriptor => descriptor.ServiceType == typeof(IBookParsingService));
+        services.Should().Contain(descriptor => descriptor.ServiceType == typeof(IVisionBookReader));
         services.Should().Contain(descriptor => descriptor.ServiceType == typeof(IBookshelfProcessingService));
         services.Should().Contain(descriptor => descriptor.ServiceType == typeof(IBookLookupService));
         services.Should().Contain(descriptor => descriptor.ServiceType == typeof(IBookEnrichmentService));
+        services.Should().Contain(descriptor => descriptor.ServiceType == typeof(IGenreClassifier));
     }
 
     [Fact]
@@ -132,5 +133,92 @@ public class BookshelfReaderServiceCollectionExtensionsTests
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("OpenLibrary:BaseUrl must use HTTPS.");
+    }
+
+    [Fact]
+    public void AddBookshelfReader_WithoutClaudeVisionApiKeyOrEnvVar_ThrowsValidationException()
+    {
+        string? originalEnvVar = Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY");
+        Environment.SetEnvironmentVariable("ANTHROPIC_API_KEY", null);
+        try
+        {
+            IConfigurationRoot configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>()).Build();
+
+            var services = new ServiceCollection();
+            services.AddBookshelfReader(configuration);
+
+            ServiceProvider provider = services.BuildServiceProvider();
+
+            Action act = () => provider.GetRequiredService<IOptions<ClaudeVisionOptions>>().Value.ToString();
+
+            act.Should().Throw<OptionsValidationException>()
+                .WithMessage("*ClaudeVision:ApiKey must be configured, or set the ANTHROPIC_API_KEY environment variable.*");
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("ANTHROPIC_API_KEY", originalEnvVar);
+        }
+    }
+
+    [Fact]
+    public void AddBookshelfReader_FallsBackToAnthropicApiKeyEnvironmentVariable()
+    {
+        string? originalEnvVar = Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY");
+        Environment.SetEnvironmentVariable("ANTHROPIC_API_KEY", "env-api-key");
+        try
+        {
+            IConfigurationRoot configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>()).Build();
+
+            var services = new ServiceCollection();
+            services.AddBookshelfReader(configuration);
+
+            ServiceProvider provider = services.BuildServiceProvider();
+
+            ClaudeVisionOptions options = provider.GetRequiredService<IOptions<ClaudeVisionOptions>>().Value;
+
+            options.ApiKey.Should().Be("env-api-key");
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("ANTHROPIC_API_KEY", originalEnvVar);
+        }
+    }
+
+    [Fact]
+    public void AddBookshelfReader_RejectsNonHttpsClaudeVisionBaseUrl()
+    {
+        IConfigurationRoot configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["ClaudeVision:ApiKey"] = "test-api-key",
+            ["ClaudeVision:BaseUrl"] = "http://example.com/"
+        }).Build();
+
+        var services = new ServiceCollection();
+        services.AddBookshelfReader(configuration);
+
+        ServiceProvider provider = services.BuildServiceProvider();
+
+        Action act = () => provider.GetRequiredService<IOptions<ClaudeVisionOptions>>().Value.ToString();
+
+        act.Should().Throw<OptionsValidationException>()
+            .WithMessage("*ClaudeVision:BaseUrl must be an absolute https URL.*");
+    }
+
+    [Fact]
+    public void AddBookshelfReader_WithValidApiKey_ResolvesVisionBookReader()
+    {
+        IConfigurationRoot configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["ClaudeVision:ApiKey"] = "test-api-key"
+        }).Build();
+
+        var services = new ServiceCollection();
+        services.AddBookshelfReader(configuration);
+
+        ServiceProvider provider = services.BuildServiceProvider();
+
+        IVisionBookReader reader = provider.GetRequiredService<IVisionBookReader>();
+
+        reader.Should().BeOfType<ClaudeVisionBookReader>();
     }
 }

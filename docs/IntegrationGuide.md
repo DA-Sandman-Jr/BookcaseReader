@@ -51,14 +51,20 @@ All routes are rooted at `/api` and described by the generated OpenAPI document 
   "diagnostics": {
     "segmentCount": 3,
     "elapsedMs": 742,
-    "notes": ["deskew applied"]
+    "notes": ["The vision model response was truncated at the configured token limit; some books may be missing."]
   }
 }
 ```
 
+`diagnostics.segmentCount` is the number of books the vision model returned (the field name is preserved from earlier versions for contract compatibility).
+
 When enrichment is enabled (the default), the service looks up each parsed title against Open Library inside the parse request and attaches the best catalog match as `metadata` - canonical title, author, first publish year, ISBN, cover image URL, and subjects (which also feed the `genres` list). `metadata` is `null` when no confident match was found; the candidate's `notes` explain why (no results, low match score, or lookup failure). Callers that prefer to orchestrate their own lookups can set `Enrichment:Enabled` to `false` and use `/api/books/lookup` per title instead. Enrichment adds outbound Open Library calls to parse latency, so expect parse requests to take a few seconds longer for shelves with many readable spines.
 
-Requests that violate validation (missing file, unsupported MIME type, OCR failure, etc.) return `400` responses with RFC 7807 bodies. When `RequireApiKey` is enabled the parse endpoint also returns `401` for missing or invalid keys, and when parse rate limiting is enabled it returns `429 Too Many Requests` plus a `Retry-After` header once callers exceed the configured limit.
+Requests that violate validation (missing file, unsupported MIME type, oversized image, undecodable image, etc.) return `400` responses with RFC 7807 bodies. When `RequireApiKey` is enabled the parse endpoint also returns `401` for missing or invalid keys, and when parse rate limiting is enabled it returns `429 Too Many Requests` plus a `Retry-After` header once callers exceed the configured limit. If the Claude vision API rejects the request (bad upstream API key, rate limiting, or a server-side error) the parse endpoint returns a `502`/`429`/`5xx` ProblemDetails response describing the upstream failure.
+
+### How book reading works
+
+`/api/bookshelf/parse` reads the uploaded image entirely in memory, normalizes it (corrects EXIF orientation, downscales so the longest edge is at most `ClaudeVision:MaxImageDimension`, and re-encodes as JPEG - which also strips all metadata, including phone GPS), and sends it to the [Anthropic Messages API](https://docs.anthropic.com/) (`ClaudeVision:Model`, default `claude-haiku-4-5`) with a structured-output schema requesting each book's title, author, and confidence. The image is never written to disk, and Anthropic does not use API inputs for model training. Results are mapped to `BookCandidate`s (with `boundingBox` always empty - the vision model does not return spine coordinates) and enriched against Open Library as described above.
 
 ## 2. Configuration & secrets
 
@@ -79,10 +85,16 @@ Configuration lives in `BookshelfReader.Host/appsettings.json` with environment-
 | `Enrichment:MinMatchScore` | Minimum fuzzy match score (0-100) before metadata is attached. | `Enrichment__MinMatchScore=55`
 | `Uploads:MaxBytes` | Maximum upload size in bytes. | `Uploads__MaxBytes=10485760`
 | `Uploads:AllowedContentTypes` | Canonical MIME types accepted from the form upload. | `Uploads__AllowedContentTypes__0=image/jpeg`
-| `Ocr:Tesseract:*` | File system path, languages, and concurrency for OCR. | `Ocr__Tesseract__DataPath=/app/tessdata`
-| `Segmentation:*` / `Parsing:*` | Heuristics controlling contour filtering and text parsing. | `Segmentation__MaxSegments=64`
+| `ClaudeVision:ApiKey` | Anthropic API key. Falls back to the `ANTHROPIC_API_KEY` environment variable if unset. Required - the host fails fast at startup without one. | `ANTHROPIC_API_KEY=sk-ant-...`
+| `ClaudeVision:BaseUrl` | Anthropic API base URL (must be HTTPS, default `https://api.anthropic.com/`). | `ClaudeVision__BaseUrl=https://api.anthropic.com/`
+| `ClaudeVision:Model` | Claude model used to read book spines (default `claude-haiku-4-5`). | `ClaudeVision__Model=claude-haiku-4-5`
+| `ClaudeVision:MaxTokens` | Max response tokens per vision request (default `2048`). | `ClaudeVision__MaxTokens=2048`
+| `ClaudeVision:TimeoutSeconds` | HTTP timeout for vision requests in seconds (default `60`). | `ClaudeVision__TimeoutSeconds=60`
+| `ClaudeVision:MaxImageDimension` | Images are downscaled so their longest edge does not exceed this many pixels before being sent to Claude (default `1568`). | `ClaudeVision__MaxImageDimension=1568`
 
 Production deployments should inject secrets through your platform's secret store (Azure Key Vault, AWS Secrets Manager, GitHub Actions secrets to environment variables). Only ship sanitized sample values in source control. The development profile (`appsettings.Development.json`) demonstrates setting a disposable key (`local-dev-key`).
+
+Create a dedicated Anthropic Console workspace and API key for this integration, with its own spend limit, so usage and billing stay isolated from other Claude usage. At `claude-haiku-4-5` pricing, a typical bookshelf photo costs roughly $0.003-$0.005 per request.
 
 ### Sample `.env` (development)
 
@@ -91,7 +103,7 @@ ASPNETCORE_ENVIRONMENT=Development
 Authentication__ApiKey__RequireApiKey=true
 Authentication__ApiKey__ValidKeys__0=local-dev-key
 RateLimiting__Parse__Enabled=true
-Ocr__Tesseract__DataPath=./tessdata
+ANTHROPIC_API_KEY=sk-ant-...
 ```
 
 Load it with `dotnet user-secrets`, `direnv`, or your preferred tooling.
@@ -114,7 +126,7 @@ BookshelfReader does not ship standalone UI assets. The recommended integration 
 ## 4. Deployment boundaries
 
 * Package and deploy the service independently (App Service, container app, Kubernetes workload, etc.).
-* Do not share infrastructure resources (storage, queues) with the host site unless absolutely necessary; BookshelfReader is stateless and depends only on outbound HTTP to Open Library and the local file system for OCR assets.
+* Do not share infrastructure resources (storage, queues) with the host site unless absolutely necessary; BookshelfReader is stateless and depends only on outbound HTTPS to the Anthropic API and Open Library. Uploaded images are processed in memory and never written to disk.
 * Expose the service via a dedicated subdomain (e.g., `https://bookshelf-reader.yourdomain.com`) or a reverse-proxy path segment. Ensure TLS termination happens at the edge the same way as your primary site.
 * If you front the service with an ingress controller or API gateway, forward the `X-API-Key` header without modification and enforce rate limits upstream.
 
@@ -134,7 +146,8 @@ Troubleshooting tips:
 * **401 Unauthorized** - Confirm `RequireApiKey` is enabled only when you supply the header. Rotate keys via configuration without redeploying.
 * **400 Bad Request** - Ensure the file field name is exactly `image` and the MIME type is allowed.
 * **Large file rejection** - Increase `Uploads:MaxBytes` temporarily during debugging.
-* **OCR missing data** - Populate `Ocr:Tesseract:DataPath` with valid traineddata files. The service now fails the first parse request with a clear `InvalidOperationException` naming the missing path or language file, and the reference host self-provisions `tessdata/eng.traineddata` during build.
+* **Host fails at startup** - `ClaudeVision:ApiKey` (or `ANTHROPIC_API_KEY`) is required; the host validates options on start and will not boot without a key.
+* **Vision request errors** - `401` from Claude means the configured API key was rejected; `429`/`529` mean the Anthropic API is rate limiting or overloaded - both surface to callers as ProblemDetails responses with the upstream message included.
 
 ## 6. Validation & CI expectations
 

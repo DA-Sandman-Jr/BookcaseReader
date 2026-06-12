@@ -11,26 +11,4 @@
   <ItemGroup>
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.9.0" />
   </ItemGroup>
-  <!-- Fetch English OCR training data on first build so the reference host
-       works out of the box. The file is gitignored; delete the tessdata folder
-       to force a re-download. -->
-  <Target Name="EnsureTessdata" BeforeTargets="AssignTargetPaths" Condition="'$(DesignTimeBuild)' != 'true'">
-    <DownloadFile
-      Condition="!Exists('$(MSBuildProjectDirectory)\tessdata\eng.traineddata')"
-      SourceUrl="https://github.com/tesseract-ocr/tessdata_fast/raw/main/eng.traineddata"
-      DestinationFolder="$(MSBuildProjectDirectory)\tessdata"
-      SkipUnchangedFiles="true" />
-  </Target>
-  <Target Name="CopyTessdataToOutput"
-          AfterTargets="Build"
-          DependsOnTargets="EnsureTessdata"
-          Condition="'$(DesignTimeBuild)' != 'true'">
-    <ItemGroup>
-      <TessdataFiles Include="$(MSBuildProjectDirectory)\tessdata\*.traineddata" />
-    </ItemGroup>
-    <MakeDir Directories="$(OutDir)tessdata" />
-    <Copy SourceFiles="@(TessdataFiles)"
-          DestinationFiles="@(TessdataFiles->'$(OutDir)tessdata\%(Filename)%(Extension)')"
-          SkipUnchangedFiles="true" />
-  </Target>
 </Project>

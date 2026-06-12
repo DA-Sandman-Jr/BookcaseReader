@@ -1,6 +1,6 @@
 # BookshelfReader - Agent Instructions
 
-BookshelfReader provides .NET 8 dependency-injection helpers and optional API endpoint mappings for a bookshelf image parsing pipeline: upload validation, segmentation, OCR, parsing, genre classification, and Open Library lookup with in-pipeline metadata enrichment.
+BookshelfReader provides .NET 8 dependency-injection helpers and optional API endpoint mappings for a bookshelf image parsing pipeline: upload validation, Claude vision book reading, genre classification, and Open Library lookup with in-pipeline metadata enrichment.
 
 ## Commands
 
@@ -36,7 +36,7 @@ dotnet pack BookshelfReader.sln -c Release
 
 ## Architecture
 
-- `BookshelfReader/` is the single packable project. It contains shared domain contracts and models (`Core/`), concrete pipeline implementations and external integrations such as OCR, segmentation, parsing, and Open Library lookup (`Infrastructure/`), service-registration helpers (`Extensions/`), and endpoint-mapping helpers and API surface (`Api/`). `dotnet pack` emits a single `BookshelfReader` NuGet package from this project.
+- `BookshelfReader/` is the single packable project. It contains shared domain contracts and models (`Core/`), concrete pipeline implementations and external integrations such as image preprocessing, the Claude vision book reader, genre classification, and Open Library lookup (`Infrastructure/`), service-registration helpers (`Extensions/`), and endpoint-mapping helpers and API surface (`Api/`). `dotnet pack` emits a single `BookshelfReader` NuGet package from this project.
 - `BookshelfReader.Host/` is a runnable reference host for local testing only; it is not the package consumers should embed.
 - `BookshelfReader.Tests/` covers DI wiring, option validation, pipeline components, and API behavior.
 
@@ -51,6 +51,6 @@ dotnet pack BookshelfReader.sln -c Release
 
 ## Configuration Notes
 
-Important configuration sections include `Authentication:ApiKey`, `RateLimiting:Parse`, `Uploads`, `OpenLibrary`, `Enrichment`, `Ocr:Tesseract`, `Segmentation`, and `Parsing`.
+Important configuration sections include `Authentication:ApiKey`, `RateLimiting:Parse`, `Uploads`, `OpenLibrary`, `Enrichment`, and `ClaudeVision`. `ClaudeVision:ApiKey` (or the `ANTHROPIC_API_KEY` environment variable) is required - the host fails fast at startup without one.
 
 Read `docs/IntegrationGuide.md` before making integration, deployment, or host-embedding changes.

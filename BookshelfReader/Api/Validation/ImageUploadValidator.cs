@@ -10,12 +10,10 @@ namespace BookshelfReader.Api.Validation;
 public sealed class ImageUploadValidator : IImageUploadValidator
 {
     private readonly UploadsOptions _uploadsOptions;
-    private readonly SegmentationOptions _segmentationOptions;
 
-    public ImageUploadValidator(IOptions<UploadsOptions> uploadsOptions, IOptions<SegmentationOptions> segmentationOptions)
+    public ImageUploadValidator(IOptions<UploadsOptions> uploadsOptions)
     {
         _uploadsOptions = uploadsOptions.Value;
-        _segmentationOptions = segmentationOptions.Value;
     }
 
     public async Task<UploadValidationResult> ValidateImageUploadAsync(HttpRequest request, CancellationToken cancellationToken)
@@ -92,10 +90,10 @@ public sealed class ImageUploadValidator : IImageUploadValidator
                 }
 
                 long pixelCount = (long)imageInfo.Width * imageInfo.Height;
-                if (pixelCount > _segmentationOptions.MaxImagePixels)
+                if (pixelCount > _uploadsOptions.MaxImagePixels)
                 {
                     return CreateValidationProblem("image",
-                        $"Uploaded image has {pixelCount:N0} pixels which exceeds the configured limit of {_segmentationOptions.MaxImagePixels:N0}.");
+                        $"Uploaded image has {pixelCount:N0} pixels which exceeds the configured limit of {_uploadsOptions.MaxImagePixels:N0}.");
                 }
             }
             catch (UnknownImageFormatException)

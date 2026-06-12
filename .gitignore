@@ -7,4 +7,3 @@ obj/
 .vs/
 TestResults/
 .nuget/
-BookshelfReader.Host/tessdata/

@@ -1,26 +1,31 @@
 using System.Diagnostics;
 using BookshelfReader.Core.Abstractions;
 using BookshelfReader.Core.Models;
+using BookshelfReader.Core.Options;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace BookshelfReader.Infrastructure.Processing;
 
 public sealed class BookshelfProcessingService : IBookshelfProcessingService
 {
-    private readonly IBookSegmentationService _segmentationService;
-    private readonly IBookSegmentProcessor _segmentProcessor;
+    private readonly IVisionBookReader _visionBookReader;
+    private readonly IGenreClassifier _genreClassifier;
     private readonly IBookEnrichmentService _enrichmentService;
+    private readonly ClaudeVisionOptions _visionOptions;
     private readonly ILogger<BookshelfProcessingService> _logger;
 
     public BookshelfProcessingService(
-        IBookSegmentationService segmentationService,
-        IBookSegmentProcessor segmentProcessor,
+        IVisionBookReader visionBookReader,
+        IGenreClassifier genreClassifier,
         IBookEnrichmentService enrichmentService,
+        IOptions<ClaudeVisionOptions> visionOptions,
         ILogger<BookshelfProcessingService> logger)
     {
-        _segmentationService = segmentationService;
-        _segmentProcessor = segmentProcessor;
+        _visionBookReader = visionBookReader;
+        _genreClassifier = genreClassifier;
         _enrichmentService = enrichmentService;
+        _visionOptions = visionOptions.Value;
         _logger = logger;
     }
 
@@ -29,28 +34,12 @@ public sealed class BookshelfProcessingService : IBookshelfProcessingService
         var stopwatch = Stopwatch.StartNew();
         var imageId = Guid.NewGuid();
 
-        IReadOnlyList<BookSegment> segments = await _segmentationService.SegmentAsync(imageStream, cancellationToken).ConfigureAwait(false);
-        _logger.LogInformation("Segmentation produced {Count} segments for image {ImageId}", segments.Count, imageId);
-        var books = new List<BookCandidate>();
-        var diagnostics = new DiagnosticsBuilder(segments.Count);
+        byte[] imageData = await ReadAllBytesAsync(imageStream, cancellationToken).ConfigureAwait(false);
 
-        for (int index = 0; index < segments.Count; index++)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
+        VisionReadResult visionResult = await _visionBookReader.ReadAsync(imageData, cancellationToken).ConfigureAwait(false);
+        _logger.LogInformation("Vision model identified {Count} book(s) for image {ImageId}", visionResult.Books.Count, imageId);
 
-            SegmentProcessingResult segmentResult = await _segmentProcessor.ProcessAsync(
-                segments[index],
-                index,
-                imageId,
-                cancellationToken).ConfigureAwait(false);
-
-            if (segmentResult.Candidate is not null)
-            {
-                books.Add(segmentResult.Candidate);
-            }
-
-            diagnostics.AddNotes(AddSegmentContext(index, segmentResult.Notes));
-        }
+        List<BookCandidate> books = visionResult.Books.Select(CreateCandidate).ToList();
 
         if (books.Count > 0)
         {
@@ -61,6 +50,8 @@ public sealed class BookshelfProcessingService : IBookshelfProcessingService
 
         stopwatch.Stop();
 
+        var diagnostics = new DiagnosticsBuilder(books.Count);
+        diagnostics.AddNotes(visionResult.Notes);
         diagnostics.SetElapsed(stopwatch.ElapsedMilliseconds);
 
         return new ParseResult
@@ -71,13 +62,30 @@ public sealed class BookshelfProcessingService : IBookshelfProcessingService
         };
     }
 
-    private static IEnumerable<string> AddSegmentContext(int index, IEnumerable<string> notes)
+    private BookCandidate CreateCandidate(VisionBookEntry entry)
     {
-        string prefix = $"Segment {index}";
+        string rawText = string.IsNullOrWhiteSpace(entry.Author)
+            ? entry.Title
+            : $"{entry.Title} — {entry.Author}";
 
-        return notes.Select(note =>
-            note.StartsWith(prefix, StringComparison.Ordinal)
-                ? note
-                : $"{prefix}: {note}");
+        var candidate = new BookCandidate
+        {
+            Title = entry.Title,
+            Author = entry.Author,
+            Confidence = entry.Confidence,
+            RawText = rawText
+        };
+
+        candidate.Genres.AddRange(_genreClassifier.Classify(candidate.Title, candidate.RawText));
+        candidate.Notes.Add($"Read by vision model {_visionOptions.Model}");
+
+        return candidate;
+    }
+
+    private static async Task<byte[]> ReadAllBytesAsync(Stream stream, CancellationToken cancellationToken)
+    {
+        using var buffer = new MemoryStream();
+        await stream.CopyToAsync(buffer, cancellationToken).ConfigureAwait(false);
+        return buffer.ToArray();
     }
 }

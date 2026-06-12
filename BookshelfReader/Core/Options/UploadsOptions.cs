@@ -30,6 +30,8 @@ public sealed class UploadsOptions
 
     public int MaxBytes { get; set; } = 10 * 1024 * 1024;
 
+    public int MaxImagePixels { get; set; } = 25_000_000;
+
     public HashSet<string> AllowedContentTypes
     {
         get => _allowedContentTypes;
