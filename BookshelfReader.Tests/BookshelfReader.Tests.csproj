@@ -15,9 +15,6 @@
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\BookshelfReader.Core\BookshelfReader.Core.csproj" />
-    <ProjectReference Include="..\BookshelfReader.Infrastructure\BookshelfReader.Infrastructure.csproj" />
-    <ProjectReference Include="..\BookshelfReader.Extensions\BookshelfReader.Extensions.csproj" />
-    <ProjectReference Include="..\BookshelfReader.Api\BookshelfReader.Api.csproj" />
+    <ProjectReference Include="..\BookshelfReader\BookshelfReader.csproj" />
   </ItemGroup>
 </Project>

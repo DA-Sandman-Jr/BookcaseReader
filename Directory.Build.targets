@@ -48,7 +48,7 @@
 
   <Target Name="SyncAgentInstructionsFromClaude"
           BeforeTargets="PrepareForBuild"
-          Condition="'$(SyncAgentInstructionsFromClaudeEnabled)' == 'true' and '$(MSBuildProjectName)' == 'BookshelfReader.Api'">
+          Condition="'$(SyncAgentInstructionsFromClaudeEnabled)' == 'true' and '$(MSBuildProjectName)' == 'BookshelfReader'">
     <ItemGroup>
       <ClaudeInstructionFiles Include="$(MSBuildThisFileDirectory)**\CLAUDE.md"
                               Exclude="$(MSBuildThisFileDirectory).git\**;$(MSBuildThisFileDirectory).vs\**;$(MSBuildThisFileDirectory)bin\**;$(MSBuildThisFileDirectory)obj\**" />
