@@ -70,7 +70,7 @@ public class ClaudeVisionBookReaderTests
         await reader.ReadAsync(TestImageBytes);
 
         capturedBody.Should().NotBeNull();
-        using JsonDocument document = JsonDocument.Parse(capturedBody!);
+        using var document = JsonDocument.Parse(capturedBody!);
         JsonElement root = document.RootElement;
 
         root.GetProperty("model").GetString().Should().Be("claude-haiku-4-5");
@@ -195,7 +195,7 @@ public class ClaudeVisionBookReaderTests
         };
         configure?.Invoke(options);
 
-        HttpClient httpClient = mockHttp.ToHttpClient();
+        var httpClient = mockHttp.ToHttpClient();
         httpClient.BaseAddress = new Uri("https://api.anthropic.com/");
 
         return new ClaudeVisionBookReader(httpClient, Microsoft.Extensions.Options.Options.Create(options), NullLogger<ClaudeVisionBookReader>.Instance);

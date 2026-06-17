@@ -233,7 +233,7 @@ public sealed class ClaudeVisionBookReader : IVisionBookReader
     {
         try
         {
-            using JsonDocument document = JsonDocument.Parse(responseBody);
+            using var document = JsonDocument.Parse(responseBody);
             if (document.RootElement.TryGetProperty("error", out JsonElement error)
                 && error.TryGetProperty("message", out JsonElement messageElement))
             {
