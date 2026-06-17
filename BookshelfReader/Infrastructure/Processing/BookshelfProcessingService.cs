@@ -39,7 +39,7 @@ public sealed class BookshelfProcessingService : IBookshelfProcessingService
         VisionReadResult visionResult = await _visionBookReader.ReadAsync(imageData, cancellationToken).ConfigureAwait(false);
         _logger.LogInformation("Vision model identified {Count} book(s) for image {ImageId}", visionResult.Books.Count, imageId);
 
-        List<BookCandidate> books = visionResult.Books.Select(CreateCandidate).ToList();
+        var books = visionResult.Books.Select(CreateCandidate).ToList();
 
         if (books.Count > 0)
         {

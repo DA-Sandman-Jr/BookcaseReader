@@ -23,7 +23,7 @@ internal static class JpegTestImages
     {
         byte[] app1 = BuildApp1ExifOrientationSegment(orientation);
 
-        var result = new byte[jpegBytes.Length + app1.Length];
+        byte[] result = new byte[jpegBytes.Length + app1.Length];
         Buffer.BlockCopy(jpegBytes, 0, result, 0, 2);
         Buffer.BlockCopy(app1, 0, result, 2, app1.Length);
         Buffer.BlockCopy(jpegBytes, 2, result, 2 + app1.Length, jpegBytes.Length - 2);
@@ -42,7 +42,7 @@ internal static class JpegTestImages
         byte[] tiffHeader = { 0x49, 0x49, 0x2A, 0x00, 0x08, 0x00, 0x00, 0x00 };
 
         // IFD0: entry count (1) + one 12-byte entry (tag 0x0112, type SHORT, count 1, value) + next-IFD offset (0).
-        var ifd0 = new byte[2 + 12 + 4];
+        byte[] ifd0 = new byte[2 + 12 + 4];
         ifd0[0] = 0x01;
         ifd0[1] = 0x00;
         ifd0[2] = 0x12; // tag low byte (0x0112)
@@ -60,7 +60,7 @@ internal static class JpegTestImages
         byte[] payload = exifHeader.Concat(tiffHeader).Concat(ifd0).ToArray();
 
         int segmentLength = payload.Length + 2;
-        var segment = new byte[4 + payload.Length];
+        byte[] segment = new byte[4 + payload.Length];
         segment[0] = 0xFF;
         segment[1] = 0xE1;
         segment[2] = (byte)(segmentLength >> 8);
