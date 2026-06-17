@@ -1,0 +1,32 @@
+name: format
+
+# Fails the build if any tracked C# file isn't dotnet-format clean. This is the
+# durable backstop behind the commit hooks: even if a hook is bypassed or
+# misconfigured, drift can never land on main.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Verify formatting
+        run: |
+          set -euo pipefail
+          SLN=$(ls *.sln | head -1)
+          if [ -z "$SLN" ]; then
+            echo "No .sln at repo root — nothing to check."
+            exit 0
+          fi
+          echo "Running dotnet format --verify-no-changes on $SLN"
+          dotnet format "$SLN" --verify-no-changes
