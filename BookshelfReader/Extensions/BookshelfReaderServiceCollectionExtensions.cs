@@ -63,24 +63,16 @@ public static class BookshelfReaderServiceCollectionExtensions
                 formOptions.MemoryBufferThreshold = (int)Math.Min(uploadOptions.Value.MaxBytes, int.MaxValue);
             });
 
-        services.AddOptions<ClaudeVisionOptions>()
-            .Bind(configuration.GetSection(ClaudeVisionOptions.SectionName))
-            .PostConfigure(options =>
-            {
-                if (string.IsNullOrWhiteSpace(options.ApiKey))
-                {
-                    options.ApiKey = Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY") ?? string.Empty;
-                }
-            })
-            .Validate(options => !string.IsNullOrWhiteSpace(options.ApiKey),
-                "ClaudeVision:ApiKey must be configured, or set the ANTHROPIC_API_KEY environment variable.")
-            .Validate(options => Uri.TryCreate(options.BaseUrl, UriKind.Absolute, out Uri? baseUri)
-                    && string.Equals(baseUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase),
-                "ClaudeVision:BaseUrl must be an absolute https URL.")
-            .Validate(options => !string.IsNullOrWhiteSpace(options.Model), "ClaudeVision:Model must be configured.")
-            .Validate(options => options.MaxTokens > 0, "ClaudeVision:MaxTokens must be greater than 0.")
-            .Validate(options => options.TimeoutSeconds > 0, "ClaudeVision:TimeoutSeconds must be greater than 0.")
-            .Validate(options => options.MaxImageDimension > 0, "ClaudeVision:MaxImageDimension must be greater than 0.")
+        VisionProvider provider = ResolveVisionProvider(configuration);
+
+        // Configure rather than Bind: the raw string is parsed by
+        // ResolveVisionProvider so an unknown value surfaces through the
+        // validator below (with a friendly message) instead of a binder
+        // conversion exception.
+        services.AddOptions<VisionOptions>()
+            .Configure(options => options.Provider = provider)
+            .Validate(options => Enum.IsDefined(options.Provider),
+                $"Vision:Provider must be one of: {string.Join(", ", Enum.GetNames<VisionProvider>())}.")
             .ValidateOnStart();
 
         services.AddOptions<EnrichmentOptions>()
@@ -95,20 +87,7 @@ public static class BookshelfReaderServiceCollectionExtensions
         services.AddSingleton<IBookEnrichmentService, BookEnrichmentService>();
         services.AddSingleton<IBookshelfProcessingService, BookshelfProcessingService>();
 
-        services.AddHttpClient<IVisionBookReader, ClaudeVisionBookReader>((provider, client) =>
-        {
-            ClaudeVisionOptions options = provider.GetRequiredService<IOptions<ClaudeVisionOptions>>().Value;
-
-            if (!Uri.TryCreate(options.BaseUrl, UriKind.Absolute, out Uri? baseUri))
-            {
-                throw new InvalidOperationException("ClaudeVision:BaseUrl must be a valid absolute URI.");
-            }
-
-            client.BaseAddress = baseUri;
-            client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
-            client.DefaultRequestHeaders.TryAddWithoutValidation("x-api-key", options.ApiKey);
-            client.DefaultRequestHeaders.TryAddWithoutValidation("anthropic-version", AnthropicVersion);
-        });
+        AddVisionBookReader(services, configuration, provider);
 
         services.AddHttpClient<IBookLookupService, OpenLibraryLookupService>((_, client) =>
         {
@@ -135,5 +114,158 @@ public static class BookshelfReaderServiceCollectionExtensions
         });
 
         return services;
+    }
+
+    /// <summary>
+    /// Reads <c>Vision:Provider</c> from configuration. Defaults to
+    /// <see cref="VisionProvider.Claude"/> (preserving the original behavior) and
+    /// accepts case-insensitive enum names. An unrecognized value is returned as
+    /// an out-of-range sentinel so the <see cref="VisionOptions"/> validator can
+    /// fail fast with a clear message instead of silently falling back.
+    /// </summary>
+    private static VisionProvider ResolveVisionProvider(IConfiguration configuration)
+    {
+        string? raw = configuration[$"{VisionOptions.SectionName}:Provider"];
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return VisionProvider.Claude;
+        }
+
+        if (Enum.TryParse(raw, ignoreCase: true, out VisionProvider parsed) && Enum.IsDefined(parsed))
+        {
+            return parsed;
+        }
+
+        // Unknown value: surface it (as an undefined enum value) so the
+        // VisionOptions validator reports the misconfiguration on start.
+        return (VisionProvider)(-1);
+    }
+
+    private static void AddVisionBookReader(IServiceCollection services, IConfiguration configuration, VisionProvider provider)
+    {
+        switch (provider)
+        {
+            case VisionProvider.OpenAI:
+                AddOpenAIVisionBookReader(services, configuration);
+                break;
+            case VisionProvider.Gemini:
+                AddGeminiVisionBookReader(services, configuration);
+                break;
+            case VisionProvider.Claude:
+            default:
+                AddClaudeVisionBookReader(services, configuration);
+                break;
+        }
+    }
+
+    private static void AddClaudeVisionBookReader(IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<ClaudeVisionOptions>()
+            .Bind(configuration.GetSection(ClaudeVisionOptions.SectionName))
+            .PostConfigure(options =>
+            {
+                if (string.IsNullOrWhiteSpace(options.ApiKey))
+                {
+                    options.ApiKey = Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY") ?? string.Empty;
+                }
+            })
+            .Validate(options => !string.IsNullOrWhiteSpace(options.ApiKey),
+                "ClaudeVision:ApiKey must be configured, or set the ANTHROPIC_API_KEY environment variable.")
+            .Validate(options => IsAbsoluteHttps(options.BaseUrl),
+                "ClaudeVision:BaseUrl must be an absolute https URL.")
+            .Validate(options => !string.IsNullOrWhiteSpace(options.Model), "ClaudeVision:Model must be configured.")
+            .Validate(options => options.MaxTokens > 0, "ClaudeVision:MaxTokens must be greater than 0.")
+            .Validate(options => options.TimeoutSeconds > 0, "ClaudeVision:TimeoutSeconds must be greater than 0.")
+            .Validate(options => options.MaxImageDimension > 0, "ClaudeVision:MaxImageDimension must be greater than 0.")
+            .ValidateOnStart();
+
+        services.AddHttpClient<IVisionBookReader, ClaudeVisionBookReader>((sp, client) =>
+        {
+            ClaudeVisionOptions options = sp.GetRequiredService<IOptions<ClaudeVisionOptions>>().Value;
+
+            client.BaseAddress = ParseBaseAddress(options.BaseUrl, ClaudeVisionOptions.SectionName);
+            client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+            client.DefaultRequestHeaders.TryAddWithoutValidation("x-api-key", options.ApiKey);
+            client.DefaultRequestHeaders.TryAddWithoutValidation("anthropic-version", AnthropicVersion);
+        });
+    }
+
+    private static void AddOpenAIVisionBookReader(IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<OpenAIVisionOptions>()
+            .Bind(configuration.GetSection(OpenAIVisionOptions.SectionName))
+            .PostConfigure(options =>
+            {
+                if (string.IsNullOrWhiteSpace(options.ApiKey))
+                {
+                    options.ApiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY") ?? string.Empty;
+                }
+            })
+            .Validate(options => !string.IsNullOrWhiteSpace(options.ApiKey),
+                "OpenAIVision:ApiKey must be configured, or set the OPENAI_API_KEY environment variable.")
+            .Validate(options => IsAbsoluteHttps(options.BaseUrl),
+                "OpenAIVision:BaseUrl must be an absolute https URL.")
+            .Validate(options => !string.IsNullOrWhiteSpace(options.Model), "OpenAIVision:Model must be configured.")
+            .Validate(options => options.MaxTokens > 0, "OpenAIVision:MaxTokens must be greater than 0.")
+            .Validate(options => options.TimeoutSeconds > 0, "OpenAIVision:TimeoutSeconds must be greater than 0.")
+            .Validate(options => options.MaxImageDimension > 0, "OpenAIVision:MaxImageDimension must be greater than 0.")
+            .ValidateOnStart();
+
+        services.AddHttpClient<IVisionBookReader, OpenAIVisionBookReader>((sp, client) =>
+        {
+            OpenAIVisionOptions options = sp.GetRequiredService<IOptions<OpenAIVisionOptions>>().Value;
+
+            client.BaseAddress = ParseBaseAddress(options.BaseUrl, OpenAIVisionOptions.SectionName);
+            client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", options.ApiKey);
+        });
+    }
+
+    private static void AddGeminiVisionBookReader(IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<GeminiVisionOptions>()
+            .Bind(configuration.GetSection(GeminiVisionOptions.SectionName))
+            .PostConfigure(options =>
+            {
+                if (string.IsNullOrWhiteSpace(options.ApiKey))
+                {
+                    options.ApiKey = Environment.GetEnvironmentVariable("GEMINI_API_KEY") ?? string.Empty;
+                }
+            })
+            .Validate(options => !string.IsNullOrWhiteSpace(options.ApiKey),
+                "GeminiVision:ApiKey must be configured, or set the GEMINI_API_KEY environment variable.")
+            .Validate(options => IsAbsoluteHttps(options.BaseUrl),
+                "GeminiVision:BaseUrl must be an absolute https URL.")
+            .Validate(options => !string.IsNullOrWhiteSpace(options.Model), "GeminiVision:Model must be configured.")
+            .Validate(options => options.MaxTokens > 0, "GeminiVision:MaxTokens must be greater than 0.")
+            .Validate(options => options.TimeoutSeconds > 0, "GeminiVision:TimeoutSeconds must be greater than 0.")
+            .Validate(options => options.MaxImageDimension > 0, "GeminiVision:MaxImageDimension must be greater than 0.")
+            .ValidateOnStart();
+
+        services.AddHttpClient<IVisionBookReader, GeminiVisionBookReader>((sp, client) =>
+        {
+            GeminiVisionOptions options = sp.GetRequiredService<IOptions<GeminiVisionOptions>>().Value;
+
+            client.BaseAddress = ParseBaseAddress(options.BaseUrl, GeminiVisionOptions.SectionName);
+            client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+            client.DefaultRequestHeaders.TryAddWithoutValidation("x-goog-api-key", options.ApiKey);
+        });
+    }
+
+    private static bool IsAbsoluteHttps(string url)
+    {
+        return Uri.TryCreate(url, UriKind.Absolute, out Uri? uri)
+            && string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static Uri ParseBaseAddress(string baseUrl, string sectionName)
+    {
+        if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out Uri? baseUri))
+        {
+            throw new InvalidOperationException($"{sectionName}:BaseUrl must be a valid absolute URI.");
+        }
+
+        return baseUri;
     }
 }

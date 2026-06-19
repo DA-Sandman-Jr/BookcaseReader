@@ -28,6 +28,6 @@
     <RepositoryType>git</RepositoryType>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageTags>bookshelf;book;claude;vision;anthropic;opencv;openlibrary;aspnetcore;pipeline</PackageTags>
+    <PackageTags>bookshelf;book;claude;vision;anthropic;openai;gemini;opencv;openlibrary;aspnetcore;pipeline</PackageTags>
   </PropertyGroup>
 </Project>
