@@ -64,7 +64,17 @@ Requests that violate validation (missing file, unsupported MIME type, oversized
 
 ### How book reading works
 
-`/api/bookshelf/parse` reads the uploaded image entirely in memory, normalizes it (corrects EXIF orientation, downscales so the longest edge is at most `ClaudeVision:MaxImageDimension`, and re-encodes as JPEG - which also strips all metadata, including phone GPS), and sends it to the [Anthropic Messages API](https://docs.anthropic.com/) (`ClaudeVision:Model`, default `claude-haiku-4-5`) with a structured-output schema requesting each book's title, author, and confidence. The image is never written to disk, and Anthropic does not use API inputs for model training. Results are mapped to `BookCandidate`s (with `boundingBox` always empty - the vision model does not return spine coordinates) and enriched against Open Library as described above.
+`/api/bookshelf/parse` reads the uploaded image entirely in memory, normalizes it (corrects EXIF orientation, downscales so the longest edge is at most the selected provider's `MaxImageDimension`, and re-encodes as JPEG - which also strips all metadata, including phone GPS), and sends it to the configured vision provider with a request for each book's title, author, and confidence. The image is never written to disk. Results are mapped to `BookCandidate`s (with `boundingBox` always empty - the vision models do not return spine coordinates) and enriched against Open Library as described above.
+
+The vision provider is pluggable via `Vision:Provider` (`Claude` (default), `OpenAI`, or `Gemini`). All three sit behind the same `IVisionBookReader` abstraction and produce the same `VisionReadResult`; only the selected provider's option section is bound and validated, so you only configure a key for the provider you use.
+
+| Provider | API | Default model | Image transport | Structured output |
+| --- | --- | --- | --- | --- |
+| `Claude` (default) | [Anthropic Messages API](https://docs.anthropic.com/) (`POST /v1/messages`) | `claude-haiku-4-5` | base64 image block | `output_config` JSON schema. Anthropic does not train on API inputs. |
+| `OpenAI` | Chat Completions (`POST /v1/chat/completions`) | `gpt-4o-mini` | base64 `image_url` data URL | `response_format: json_object` |
+| `Gemini` | Generative Language API (`POST v1beta/models/{model}:generateContent`) | `gemini-2.0-flash` | base64 `inline_data` | `generationConfig.responseMimeType: application/json` |
+
+Capability notes: the default models for all three providers accept images well above BookshelfReader's `MaxImageDimension` (1568 px longest edge), so the configured downscale is the effective ceiling. OpenAI and Gemini use native JSON-mode/structured-output settings plus an explicit JSON instruction in the prompt (Claude additionally constrains output with a JSON schema); the readers tolerate prose or code-fence wrapping around the JSON object. Error handling (401/403 key rejection, 429 rate limiting, 5xx server errors, timeouts) is normalized across providers to the same `VisionBookReaderException` messages.
 
 ## 2. Configuration & secrets
 
@@ -85,16 +95,25 @@ Configuration lives in `BookshelfReader.Host/appsettings.json` with environment-
 | `Enrichment:MinMatchScore` | Minimum fuzzy match score (0-100) before metadata is attached. | `Enrichment__MinMatchScore=55`
 | `Uploads:MaxBytes` | Maximum upload size in bytes. | `Uploads__MaxBytes=10485760`
 | `Uploads:AllowedContentTypes` | Canonical MIME types accepted from the form upload. | `Uploads__AllowedContentTypes__0=image/jpeg`
-| `ClaudeVision:ApiKey` | Anthropic API key. Falls back to the `ANTHROPIC_API_KEY` environment variable if unset. Required - the host fails fast at startup without one. | `ANTHROPIC_API_KEY=sk-ant-...`
+| `Vision:Provider` | Vision backend: `Claude` (default), `OpenAI`, or `Gemini`. Only the selected provider's section is bound/validated. | `Vision__Provider=OpenAI`
+| `ClaudeVision:ApiKey` | Anthropic API key (used when provider is `Claude`). Falls back to `ANTHROPIC_API_KEY`. Required for this provider - the host fails fast at startup without one. | `ANTHROPIC_API_KEY=sk-ant-...`
 | `ClaudeVision:BaseUrl` | Anthropic API base URL (must be HTTPS, default `https://api.anthropic.com/`). | `ClaudeVision__BaseUrl=https://api.anthropic.com/`
 | `ClaudeVision:Model` | Claude model used to read book spines (default `claude-haiku-4-5`). | `ClaudeVision__Model=claude-haiku-4-5`
 | `ClaudeVision:MaxTokens` | Max response tokens per vision request (default `2048`). | `ClaudeVision__MaxTokens=2048`
 | `ClaudeVision:TimeoutSeconds` | HTTP timeout for vision requests in seconds (default `60`). | `ClaudeVision__TimeoutSeconds=60`
-| `ClaudeVision:MaxImageDimension` | Images are downscaled so their longest edge does not exceed this many pixels before being sent to Claude (default `1568`). | `ClaudeVision__MaxImageDimension=1568`
+| `ClaudeVision:MaxImageDimension` | Images are downscaled so their longest edge does not exceed this many pixels before being sent (default `1568`). | `ClaudeVision__MaxImageDimension=1568`
+| `OpenAIVision:ApiKey` | OpenAI API key (used when provider is `OpenAI`). Falls back to `OPENAI_API_KEY`. Required for this provider. | `OPENAI_API_KEY=sk-...`
+| `OpenAIVision:BaseUrl` | OpenAI API base URL (must be HTTPS, default `https://api.openai.com/`). | `OpenAIVision__BaseUrl=https://api.openai.com/`
+| `OpenAIVision:Model` | Vision-capable OpenAI chat model (default `gpt-4o-mini`). | `OpenAIVision__Model=gpt-4o-mini`
+| `OpenAIVision:MaxTokens` / `TimeoutSeconds` / `MaxImageDimension` | Same meanings/defaults (`2048`/`60`/`1568`) as the Claude options. | `OpenAIVision__MaxTokens=2048`
+| `GeminiVision:ApiKey` | Gemini API key (used when provider is `Gemini`). Falls back to `GEMINI_API_KEY`. Required for this provider. | `GEMINI_API_KEY=...`
+| `GeminiVision:BaseUrl` | Gemini API base URL (must be HTTPS, default `https://generativelanguage.googleapis.com/`). | `GeminiVision__BaseUrl=https://generativelanguage.googleapis.com/`
+| `GeminiVision:Model` | Multimodal Gemini model (default `gemini-2.0-flash`). | `GeminiVision__Model=gemini-2.0-flash`
+| `GeminiVision:MaxTokens` / `TimeoutSeconds` / `MaxImageDimension` | Same meanings/defaults (`2048`/`60`/`1568`) as the Claude options. | `GeminiVision__MaxTokens=2048`
 
 Production deployments should inject secrets through your platform's secret store (Azure Key Vault, AWS Secrets Manager, GitHub Actions secrets to environment variables). Only ship sanitized sample values in source control. The development profile (`appsettings.Development.json`) demonstrates setting a disposable key (`local-dev-key`).
 
-Create a dedicated Anthropic Console workspace and API key for this integration, with its own spend limit, so usage and billing stay isolated from other Claude usage. At `claude-haiku-4-5` pricing, a typical bookshelf photo costs roughly $0.003-$0.005 per request.
+Create a dedicated console workspace and API key for whichever provider you select, with its own spend limit, so usage and billing stay isolated. At Claude `claude-haiku-4-5` pricing, a typical bookshelf photo costs roughly $0.003-$0.005 per request; OpenAI `gpt-4o-mini` and Gemini `gemini-2.0-flash` are comparable low-cost vision models, with exact costs varying by provider and image size.
 
 ### Sample `.env` (development)
 
@@ -103,7 +122,13 @@ ASPNETCORE_ENVIRONMENT=Development
 Authentication__ApiKey__RequireApiKey=true
 Authentication__ApiKey__ValidKeys__0=local-dev-key
 RateLimiting__Parse__Enabled=true
+# Default provider is Claude:
 ANTHROPIC_API_KEY=sk-ant-...
+# Or pick another provider and supply its key instead:
+# Vision__Provider=OpenAI
+# OPENAI_API_KEY=sk-...
+# Vision__Provider=Gemini
+# GEMINI_API_KEY=...
 ```
 
 Load it with `dotnet user-secrets`, `direnv`, or your preferred tooling.
@@ -146,8 +171,8 @@ Troubleshooting tips:
 * **401 Unauthorized** - Confirm `RequireApiKey` is enabled only when you supply the header. Rotate keys via configuration without redeploying.
 * **400 Bad Request** - Ensure the file field name is exactly `image` and the MIME type is allowed.
 * **Large file rejection** - Increase `Uploads:MaxBytes` temporarily during debugging.
-* **Host fails at startup** - `ClaudeVision:ApiKey` (or `ANTHROPIC_API_KEY`) is required; the host validates options on start and will not boot without a key.
-* **Vision request errors** - `401` from Claude means the configured API key was rejected; `429`/`529` mean the Anthropic API is rate limiting or overloaded - both surface to callers as ProblemDetails responses with the upstream message included.
+* **Host fails at startup** - the selected provider's API key is required (`ClaudeVision:ApiKey`/`ANTHROPIC_API_KEY`, `OpenAIVision:ApiKey`/`OPENAI_API_KEY`, or `GeminiVision:ApiKey`/`GEMINI_API_KEY`); the host validates options on start and will not boot without a key for the configured `Vision:Provider`. An unrecognized `Vision:Provider` value also fails startup with a message listing the valid choices.
+* **Vision request errors** - `401`/`403` means the configured API key was rejected; `429`/`529` mean the provider is rate limiting or overloaded - all surface to callers as ProblemDetails responses with the upstream message included, regardless of provider.
 
 ## 6. Validation & CI expectations
 
