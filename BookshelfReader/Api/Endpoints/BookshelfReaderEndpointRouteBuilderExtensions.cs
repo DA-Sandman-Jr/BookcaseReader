@@ -22,7 +22,7 @@ public static class BookshelfReaderEndpointRouteBuilderExtensions
 
     public static RouteGroupBuilder MapBookshelfReaderApi(this IEndpointRouteBuilder app)
     {
-        RouteGroupBuilder apiGroup = app.MapGroup(ApiBasePath).WithOpenApi();
+        RouteGroupBuilder apiGroup = app.MapGroup(ApiBasePath);
 
         apiGroup.MapGet("/books/lookup", LookupAsync)
             .WithName("LookupBooks")
